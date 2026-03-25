@@ -6,7 +6,7 @@ class DataParser {
   constructor() {
     this.bulletDataPath = process.env.BULLET_DATA_DIR
       ? path.resolve(process.env.BULLET_DATA_DIR)
-      : path.resolve(__dirname, '..', '测试新子弹价格数据', '总子弹数据');
+      : path.resolve(__dirname, '..', 'Datasets', 'Datasets');
 
     this._indexCache = null;
     this._indexCacheDirMtimeMs = null;
