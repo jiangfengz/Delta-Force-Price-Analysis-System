@@ -1,0 +1,159 @@
+META: {"task_name": "long_term_forecast", "model_id": "V19_7d_12Gauge_Collection_Category_LongCtx2_480_D_Best_LongSeq_M_480_D512_P168", "model": "TimeXer", "data": "custom", "features": "M", "seq_len": 480, "label_len": 240, "pred_len": 168, "d_model": 512, "n_heads": 8, "e_layers": 4, "d_layers": 2, "d_ff": 2048, "expand": 2, "d_conv": 4, "factor": 3, "embed": "timeF", "distil": true, "des": "Exp19_7d_12Gauge_LongCtx2_480_D_Best_LongSeq_M", "itr_index": 0, "setting_for_checkpoints": "V19_7d_12Gauge_Collection_Category_LongCtx2_480_D_Best_LongSeq_M_480_D512_P168"}
+Args in experiment:
+[1mBasic Config[0m
+  Task Name:          long_term_forecast  Is Training:        1                   
+  Model ID:           V19_7d_12Gauge_Collection_Category_LongCtx2_480_D_Best_LongSeq_M_480_D512_P168Model:              TimeXer             
+
+[1mData Loader[0m
+  Data:               custom              Root Path:          e:\project\三角洲行动物价捕获分析\TimeXer\dataset\bullet_new
+  Data Path:          12 Gauge.csv        Features:           M                   
+  Target:             12 Gauge            Freq:               h                   
+  Checkpoints:        ./checkpoints/      
+
+[1mForecasting Task[0m
+  Seq Len:            480                 Label Len:          240                 
+  Pred Len:           168                 Seasonal Patterns:  Monthly             
+  Inverse:            0                   
+
+[1mModel Parameters[0m
+  Top k:              5                   Num Kernels:        6                   
+  Enc In:             7                   Dec In:             7                   
+  C Out:              7                   d model:            512                 
+  n heads:            8                   e layers:           4                   
+  d layers:           2                   d FF:               2048                
+  Moving Avg:         25                  Factor:             3                   
+  Distil:             1                   Dropout:            0.1                 
+  Embed:              timeF               Activation:         gelu                
+
+[1mRun Parameters[0m
+  Num Workers:        0                   Itr:                1                   
+  Train Epochs:       400                 Batch Size:         32                  
+  Patience:           30                  Learning Rate:      0.0005              
+  Des:                Exp19_7d_12Gauge_LongCtx2_480_D_Best_LongSeq_MLoss:               MSE                 
+  Lradj:              plateau             Use Amp:            0                   
+
+[1mGPU[0m
+  Use GPU:            1                   GPU:                0                   
+  Use Multi GPU:      0                   Devices:            0,1,2,3             
+
+[1mDe-stationary Projector Params[0m
+  P Hidden Dims:      128, 128            P Hidden Layers:    2                   
+
+Data Path: 12 Gauge.csv
+Original enc_in: 7, c_out: 7
+Updated enc_in: 15, dec_in: 15, c_out: 8
+Use GPU: cuda:0
+>>>>>>>start training : long_term_forecast_V19_7d_12Gauge_Collection_Category_LongCtx2_480_D_Best_LongSeq_M_480_D512_P168_TimeXer_custom_ftM_sl480_ll240_pl168_dm512_nh8_el4_dl2_df2048_expand2_dc4_fc3_ebtimeF_dtTrue_Exp19_7d_12Gauge_LongCtx2_480_D_Best_LongSeq_M_0>>>>>>>>>>>>>>>>>>>>>>>>>>
+train 2390
+val 485
+test 483
+Epoch: 1 cost time: 16.743792295455933
+Epoch: 1, Steps: 75 | Train Loss: 0.9963625 Vali Loss: 0.9050791 Test Loss: 0.3390344
+Validation loss decreased (inf --> 0.905079).  Saving model ...
+Epoch: 2 cost time: 13.560552835464478
+Epoch: 2, Steps: 75 | Train Loss: 0.5021202 Vali Loss: 0.9885672 Test Loss: 0.3113948
+EarlyStopping counter: 1 out of 30
+Epoch: 3 cost time: 13.546363830566406
+Epoch: 3, Steps: 75 | Train Loss: 0.4313978 Vali Loss: 1.1033275 Test Loss: 0.3272148
+EarlyStopping counter: 2 out of 30
+Epoch: 4 cost time: 13.300507545471191
+Epoch: 4, Steps: 75 | Train Loss: 0.3781098 Vali Loss: 1.0973496 Test Loss: 0.3078620
+EarlyStopping counter: 3 out of 30
+Epoch: 5 cost time: 13.521150588989258
+Epoch: 5, Steps: 75 | Train Loss: 0.3193450 Vali Loss: 1.0331782 Test Loss: 0.3084253
+EarlyStopping counter: 4 out of 30
+Epoch: 6 cost time: 13.60785174369812
+Epoch: 6, Steps: 75 | Train Loss: 0.2969497 Vali Loss: 0.9467620 Test Loss: 0.3060119
+EarlyStopping counter: 5 out of 30
+Epoch: 7 cost time: 13.236389636993408
+Epoch: 7, Steps: 75 | Train Loss: 0.2803972 Vali Loss: 0.9279917 Test Loss: 0.3172969
+EarlyStopping counter: 6 out of 30
+Epoch: 8 cost time: 13.448129892349243
+Epoch: 8, Steps: 75 | Train Loss: 0.2650115 Vali Loss: 0.9626238 Test Loss: 0.3045392
+EarlyStopping counter: 7 out of 30
+Epoch: 9 cost time: 13.877647399902344
+Epoch: 9, Steps: 75 | Train Loss: 0.2564900 Vali Loss: 0.9131438 Test Loss: 0.3128669
+EarlyStopping counter: 8 out of 30
+Epoch: 10 cost time: 14.301687240600586
+Epoch: 10, Steps: 75 | Train Loss: 0.2528342 Vali Loss: 0.9129078 Test Loss: 0.3113972
+EarlyStopping counter: 9 out of 30
+Epoch: 11 cost time: 13.97030234336853
+Epoch: 11, Steps: 75 | Train Loss: 0.2457823 Vali Loss: 0.9368339 Test Loss: 0.3094605
+EarlyStopping counter: 10 out of 30
+Epoch: 12 cost time: 14.29336667060852
+Epoch: 12, Steps: 75 | Train Loss: 0.2403145 Vali Loss: 0.9713309 Test Loss: 0.3079719
+EarlyStopping counter: 11 out of 30
+Epoch: 13 cost time: 14.377760171890259
+Epoch: 13, Steps: 75 | Train Loss: 0.2391937 Vali Loss: 0.9486034 Test Loss: 0.3093722
+EarlyStopping counter: 12 out of 30
+Epoch: 14 cost time: 14.49186110496521
+Epoch: 14, Steps: 75 | Train Loss: 0.2349255 Vali Loss: 0.9334094 Test Loss: 0.3095796
+EarlyStopping counter: 13 out of 30
+Epoch: 15 cost time: 14.458988189697266
+Epoch: 15, Steps: 75 | Train Loss: 0.2327433 Vali Loss: 0.9244753 Test Loss: 0.3116799
+EarlyStopping counter: 14 out of 30
+Epoch: 16 cost time: 14.443630933761597
+Epoch: 16, Steps: 75 | Train Loss: 0.2307306 Vali Loss: 0.9315674 Test Loss: 0.3091624
+EarlyStopping counter: 15 out of 30
+Epoch: 17 cost time: 14.361176013946533
+Epoch: 17, Steps: 75 | Train Loss: 0.2303719 Vali Loss: 0.9657844 Test Loss: 0.3132713
+EarlyStopping counter: 16 out of 30
+Epoch: 18 cost time: 14.083571195602417
+Epoch: 18, Steps: 75 | Train Loss: 0.2281339 Vali Loss: 0.9647271 Test Loss: 0.3123465
+EarlyStopping counter: 17 out of 30
+Epoch: 19 cost time: 14.373651027679443
+Epoch: 19, Steps: 75 | Train Loss: 0.2283386 Vali Loss: 0.9433732 Test Loss: 0.3153445
+EarlyStopping counter: 18 out of 30
+Epoch: 20 cost time: 14.318248987197876
+Epoch: 20, Steps: 75 | Train Loss: 0.2272774 Vali Loss: 0.9384605 Test Loss: 0.3120340
+EarlyStopping counter: 19 out of 30
+Epoch: 21 cost time: 14.422698259353638
+Epoch: 21, Steps: 75 | Train Loss: 0.2265369 Vali Loss: 0.9425114 Test Loss: 0.3122572
+EarlyStopping counter: 20 out of 30
+Epoch: 22 cost time: 14.086229801177979
+Epoch: 22, Steps: 75 | Train Loss: 0.2253551 Vali Loss: 0.9255522 Test Loss: 0.3134485
+EarlyStopping counter: 21 out of 30
+Epoch: 23 cost time: 35.38243341445923
+Epoch: 23, Steps: 75 | Train Loss: 0.2251542 Vali Loss: 0.9536899 Test Loss: 0.3131168
+EarlyStopping counter: 22 out of 30
+Epoch: 24 cost time: 44.056119203567505
+Epoch: 24, Steps: 75 | Train Loss: 0.2262144 Vali Loss: 0.9195924 Test Loss: 0.3133663
+EarlyStopping counter: 23 out of 30
+Epoch: 25 cost time: 44.253997802734375
+Epoch: 25, Steps: 75 | Train Loss: 0.2250759 Vali Loss: 0.9249983 Test Loss: 0.3133455
+EarlyStopping counter: 24 out of 30
+Epoch: 26 cost time: 43.96868872642517
+Epoch: 26, Steps: 75 | Train Loss: 0.2255393 Vali Loss: 0.9084646 Test Loss: 0.3132386
+EarlyStopping counter: 25 out of 30
+Epoch: 27 cost time: 43.558871269226074
+Epoch: 27, Steps: 75 | Train Loss: 0.2256144 Vali Loss: 0.9425996 Test Loss: 0.3123220
+EarlyStopping counter: 26 out of 30
+Epoch: 28 cost time: 37.22150111198425
+Epoch: 28, Steps: 75 | Train Loss: 0.2241083 Vali Loss: 0.9285877 Test Loss: 0.3124704
+EarlyStopping counter: 27 out of 30
+Epoch: 29 cost time: 35.040300607681274
+Epoch: 29, Steps: 75 | Train Loss: 0.2246578 Vali Loss: 0.9352512 Test Loss: 0.3130769
+EarlyStopping counter: 28 out of 30
+Epoch: 30 cost time: 34.49580144882202
+Epoch: 30, Steps: 75 | Train Loss: 0.2234958 Vali Loss: 0.9434555 Test Loss: 0.3135400
+EarlyStopping counter: 29 out of 30
+Epoch: 31 cost time: 33.7438108921051
+Epoch: 31, Steps: 75 | Train Loss: 0.2239463 Vali Loss: 0.9179112 Test Loss: 0.3132021
+EarlyStopping counter: 30 out of 30
+Early stopping
+>>>>>>>testing : long_term_forecast_V19_7d_12Gauge_Collection_Category_LongCtx2_480_D_Best_LongSeq_M_480_D512_P168_TimeXer_custom_ftM_sl480_ll240_pl168_dm512_nh8_el4_dl2_df2048_expand2_dc4_fc3_ebtimeF_dtTrue_Exp19_7d_12Gauge_LongCtx2_480_D_Best_LongSeq_M_0<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+test 483
+test shape: (483, 168, 8) (483, 168, 8)
+test shape: (483, 168, 8) (483, 168, 8)
+mse:0.33764389157295227, mae:0.40070682764053345
+Detailed metrics saved to E:\project\三角洲行动物价捕获分析\TimeXer\results\V19_7d_12Gauge_Collection_Category_LongCtx2_480_D_Best_LongSeq_M_480_D512_P168\metrics_detail.csv
+Generating full test set visualizations for E:\project\三角洲行动物价捕获分析\TimeXer\results\V19_7d_12Gauge_Collection_Category_LongCtx2_480_D_Best_LongSeq_M_480_D512_P168...
+  Generating 483 individual sample plots for Feature 0...
+  Generating 483 individual sample plots for Feature 1...
+  Generating 483 individual sample plots for Feature 2...
+  Generating 483 individual sample plots for Feature 3...
+  Generating 483 individual sample plots for Feature 4...
+  Generating 483 individual sample plots for Feature 5...
+  Generating 483 individual sample plots for Feature 6...
+  Generating 483 individual sample plots for Feature 7...
+  Full visualization completed in E:\project\三角洲行动物价捕获分析\TimeXer\results\V19_7d_12Gauge_Collection_Category_LongCtx2_480_D_Best_LongSeq_M_480_D512_P168\visualization_full
