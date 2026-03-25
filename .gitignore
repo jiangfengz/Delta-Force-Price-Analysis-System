@@ -58,7 +58,4 @@ yarn-error.log
 Datasets/daily Dataset/
 TimeXer/backup/
 Datasets/__pycache__/
-TimeXer/checkpoints/
-TimeXer/results/
-TimeXer/test_results/
 TimeXer/result_long_term_forecast.txt
