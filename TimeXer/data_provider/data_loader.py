@@ -68,8 +68,8 @@ class Dataset_ETT_hour(Dataset):
             # data_x includes ALL features (targets + exog)
             df_data_x = df_raw[cols_data]
             
-            # data_y includes ONLY target features
-            df_data_y = df_raw[target_cols]
+            # data_y includes ALL features (targets + exog) to provide future exog values
+            df_data_y = df_raw[cols_data]
         elif self.features == 'S':
             df_data_x = df_raw[[self.target]]
             df_data_y = df_raw[[self.target]]
@@ -81,21 +81,15 @@ class Dataset_ETT_hour(Dataset):
             self.scaler.fit(train_data_x.values)
             data_x = self.scaler.transform(df_data_x.values)
             
-            # For y, we need to be careful. If we want to inverse_transform later, 
-            # we should probably have a separate scaler for y or handle it carefully.
-            # But standard TimeXer usage often inverses the whole output.
-            # To be safe and simple: data_y is just the sliced columns of transformed data_x
-            # IF target columns are a subset of data_x columns.
-            # We identified target_cols from cols_data, so they are a subset.
-            # We need the indices of target_cols in cols_data to slice correctly.
+            # data_y is simply identical to data_x in multi-variate to provide exog values
             target_indices = [cols_data.get_loc(c) for c in target_cols]
             self.target_indices = target_indices
-            data_y = data_x[:, target_indices]
+            data_y = data_x
         else:
             data_x = df_data_x.values
             target_indices = [cols_data.get_loc(c) for c in target_cols]
             self.target_indices = target_indices
-            data_y = data_x[:, target_indices]
+            data_y = data_x
 
         df_stamp = df_raw[['date']][border1:border2]
         df_stamp['date'] = pd.to_datetime(df_stamp.date)
@@ -199,8 +193,8 @@ class Dataset_ETT_minute(Dataset):
             # data_x includes ALL features (targets + exog)
             df_data_x = df_raw[cols_data]
             
-            # data_y includes ONLY target features
-            df_data_y = df_raw[target_cols]
+            # data_y includes ALL features (targets + exog) to provide future exog values
+            df_data_y = df_raw[cols_data]
         elif self.features == 'S':
             df_data_x = df_raw[[self.target]]
             df_data_y = df_raw[[self.target]]
@@ -212,15 +206,15 @@ class Dataset_ETT_minute(Dataset):
             self.scaler.fit(train_data_x.values)
             data_x = self.scaler.transform(df_data_x.values)
             
-            # For y, use sliced columns from transformed data_x
+            # data_y is simply identical to data_x in multi-variate to provide exog values
             target_indices = [cols_data.get_loc(c) for c in target_cols]
             self.target_indices = target_indices
-            data_y = data_x[:, target_indices]
+            data_y = data_x
         else:
             data_x = df_data_x.values
             target_indices = [cols_data.get_loc(c) for c in target_cols]
             self.target_indices = target_indices
-            data_y = data_x[:, target_indices]
+            data_y = data_x
 
         df_stamp = df_raw[['date']][border1:border2]
         df_stamp['date'] = pd.to_datetime(df_stamp.date)
@@ -340,8 +334,8 @@ class Dataset_Custom(Dataset):
             # data_x includes ALL features (targets + exog)
             df_data_x = df_raw[cols_data]
             
-            # data_y includes ONLY target features
-            df_data_y = df_raw[target_cols]
+            # data_y includes ALL features (targets + exog) to provide future exog values
+            df_data_y = df_raw[cols_data]
         elif self.features == 'S':
             df_data_x = df_raw[[self.target]]
             df_data_y = df_raw[[self.target]]
@@ -353,15 +347,15 @@ class Dataset_Custom(Dataset):
             self.scaler.fit(train_data_x.values)
             data_x = self.scaler.transform(df_data_x.values)
             
-            # For y, use sliced columns from transformed data_x
+            # data_y is simply identical to data_x in multi-variate to provide exog values
             target_indices = [cols_data.get_loc(c) for c in target_cols]
             self.target_indices = target_indices
-            data_y = data_x[:, target_indices]
+            data_y = data_x
         else:
             data_x = df_data_x.values
             target_indices = [cols_data.get_loc(c) for c in target_cols]
             self.target_indices = target_indices
-            data_y = data_x[:, target_indices]
+            data_y = data_x
 
         df_stamp = df_raw[['date']][border1:border2]
         df_stamp['date'] = pd.to_datetime(df_stamp.date)

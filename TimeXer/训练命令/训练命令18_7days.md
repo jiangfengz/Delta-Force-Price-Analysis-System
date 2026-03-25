@@ -1,0 +1,3883 @@
+# 训练命令18：7days（collection_category）六组参数批量训练（TimeXer + M）
+
+基于 `训练命令17_7days.md` 的 7 天跨度训练产物（`backup/5 models in 7 days`）整理得到的经验与下一轮改进方案。
+
+## 1. 训练结果经验总结（来自 V17_7d）
+
+### 1.1 五个参数族的整体表现（19 个数据集）
+V17_7d 的 5 个参数族分别为：
+- Opt2_192_Plateau4：seq=192,label=96,d_model=512,e_layers=4,lr=5e-4,lradj=plateau(plateau_patience=3)
+- Deep6_240：seq=240,label=120,d_model=512,e_layers=6,lr=3e-4,lradj=type3
+- MidLarge_640：seq=240,label=120,d_model=640,e_layers=4,lr=5e-4,lradj=plateau
+- Exp_Long_M_336_A：seq=336,label=168,d_model=512,e_layers=4,lr=5e-4,lradj=plateau
+- LongCtx2_384：seq=384,label=192,d_model=512,e_layers=4,lr=5e-4,lradj=plateau
+
+结论：Deep6/Opt2/Exp_Long 是主力结构族，但个别数据集需要更长上下文或更大 d_model。
+
+### 1.2 各数据集 V17_7d 最优参数族（best_family）
+| dataset | best_family | best_MSE | best_MAE |
+|---|---|---:|---:|
+| 127x55mm | Deep6_240 | 0.16867743 | 0.3189783 |
+| 12Gauge | LongCtx2_384 | 0.40457243 | 0.47703373 |
+| 300BLK | Opt2_192_Plateau4 | 0.20710099 | 0.35793516 |
+| 357Magnum | LongCtx2_384 | 0.3823724 | 0.3528773 |
+| 4570Govt | Exp_Long_M_336_A | 0.56963044 | 0.59442246 |
+| 45ACP | Exp_Long_M_336_A | 0.48217535 | 0.52831423 |
+| 46x30mm | Opt2_192_Plateau4 | 0.25903302 | 0.33125985 |
+| 50AE | Opt2_192_Plateau4 | 0.06924474 | 0.1851879 |
+| 545x39mm | MidLarge_640 | 0.22377753 | 0.31007814 |
+| 556x45mm | Exp_Long_M_336_A | 0.36028442 | 0.43469447 |
+| 57x28mm | Deep6_240 | 0.45056513 | 0.51513 |
+| 58x42mm | Deep6_240 | 0.45264623 | 0.5042385 |
+| 68x51mm | Deep6_240 | 0.32435477 | 0.45726442 |
+| 762x39mm | Opt2_192_Plateau4 | 0.26889893 | 0.35068548 |
+| 762x51mm | Deep6_240 | 0.42666236 | 0.37872955 |
+| 762x54R | Exp_Long_M_336_A | 0.2725233 | 0.40654936 |
+| 9x19mm | MidLarge_640 | 0.31420958 | 0.4091772 |
+| 9x39mm | Opt2_192_Plateau4 | 0.33987543 | 0.42529303 |
+| Arrow | Deep6_240 | 0.2673665 | 0.3626171 |
+
+### 1.3 V18_7d 的 6 组改进策略（围绕最优结构做微调 + 次优结构对照）
+1. Best_Base：复现 V17_7d 最优结构（锚点）。
+2. Best_LRDown：同结构，学习率下调（更稳）。
+3. Best_LRUp：同结构，学习率上调（更快探索）。
+4. Best_LongSeq：同结构，增大 seq_len（更强上下文）。
+5. Best_Patch32：同结构，patch_len=32 + dropout=0.15（更强正则/更粗粒度 patch）。
+6. Alt_2ndBase：使用该数据集在 V17_7d 的次优结构（防局部最优）。
+
+## 2. 训练固定约束（必须满足）
+- --model TimeXer
+- --features M（M 模式）
+- --pred_len 168（7days）
+- --num_workers 0
+
+版本标记：V18_7d（model_id 末尾统一保留 _P168）
+
+---
+
+```powershell
+# =========================
+# 1) .300BLK（M）
+# =========================
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".300BLK.csv" `
+  --model_id "V18_7d_300BLK_Collection_Category_Opt2_192_Plateau4_A_Best_Base_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".300BLK" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_300BLK_Opt2_192_Plateau4_A_Best_Base_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".300BLK.csv" `
+  --model_id "V18_7d_300BLK_Collection_Category_Opt2_192_Plateau4_B_Best_LRDown_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".300BLK" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_300BLK_Opt2_192_Plateau4_B_Best_LRDown_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".300BLK.csv" `
+  --model_id "V18_7d_300BLK_Collection_Category_Opt2_192_Plateau4_C_Best_LRUp_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".300BLK" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_300BLK_Opt2_192_Plateau4_C_Best_LRUp_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0008 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".300BLK.csv" `
+  --model_id "V18_7d_300BLK_Collection_Category_Opt2_288_D_Best_LongSeq_M_288_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".300BLK" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 288 `
+  --label_len 144 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_300BLK_Opt2_288_D_Best_LongSeq_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".300BLK.csv" `
+  --model_id "V18_7d_300BLK_Collection_Category_Opt2_192_Plateau4_E_Best_Patch32_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".300BLK" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 32 `
+  --dropout 0.15 `
+  --des "Exp18_7d_300BLK_Opt2_192_Plateau4_E_Best_Patch32_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".300BLK.csv" `
+  --model_id "V18_7d_300BLK_Collection_Category_LongCtx2_384_F_Alt_2ndBase_M_384_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".300BLK" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 384 `
+  --label_len 192 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_300BLK_LongCtx2_384_F_Alt_2ndBase_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+# =========================
+# 2) .357 Magnum（M）
+# =========================
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".357 Magnum.csv" `
+  --model_id "V18_7d_357Magnum_Collection_Category_LongCtx2_384_A_Best_Base_M_384_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".357 Magnum" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 384 `
+  --label_len 192 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_357Magnum_LongCtx2_384_A_Best_Base_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".357 Magnum.csv" `
+  --model_id "V18_7d_357Magnum_Collection_Category_LongCtx2_384_B_Best_LRDown_M_384_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".357 Magnum" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 384 `
+  --label_len 192 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_357Magnum_LongCtx2_384_B_Best_LRDown_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".357 Magnum.csv" `
+  --model_id "V18_7d_357Magnum_Collection_Category_LongCtx2_384_C_Best_LRUp_M_384_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".357 Magnum" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 384 `
+  --label_len 192 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_357Magnum_LongCtx2_384_C_Best_LRUp_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0008 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".357 Magnum.csv" `
+  --model_id "V18_7d_357Magnum_Collection_Category_LongCtx2_480_D_Best_LongSeq_M_480_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".357 Magnum" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 480 `
+  --label_len 240 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_357Magnum_LongCtx2_480_D_Best_LongSeq_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 32 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".357 Magnum.csv" `
+  --model_id "V18_7d_357Magnum_Collection_Category_LongCtx2_384_E_Best_Patch32_M_384_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".357 Magnum" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 384 `
+  --label_len 192 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 32 `
+  --dropout 0.15 `
+  --des "Exp18_7d_357Magnum_LongCtx2_384_E_Best_Patch32_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".357 Magnum.csv" `
+  --model_id "V18_7d_357Magnum_Collection_Category_Exp_Long_M_336_A_F_Alt_2ndBase_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".357 Magnum" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_357Magnum_Exp_Long_M_336_A_F_Alt_2ndBase_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+# =========================
+# 3) .45 ACP（M）
+# =========================
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".45 ACP.csv" `
+  --model_id "V18_7d_45ACP_Collection_Category_Exp_Long_M_336_A_A_Best_Base_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".45 ACP" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_45ACP_Exp_Long_M_336_A_A_Best_Base_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".45 ACP.csv" `
+  --model_id "V18_7d_45ACP_Collection_Category_Exp_Long_M_336_A_B_Best_LRDown_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".45 ACP" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_45ACP_Exp_Long_M_336_A_B_Best_LRDown_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".45 ACP.csv" `
+  --model_id "V18_7d_45ACP_Collection_Category_Exp_Long_M_336_A_C_Best_LRUp_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".45 ACP" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_45ACP_Exp_Long_M_336_A_C_Best_LRUp_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0008 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".45 ACP.csv" `
+  --model_id "V18_7d_45ACP_Collection_Category_ExpLong_432_D_Best_LongSeq_M_432_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".45 ACP" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 432 `
+  --label_len 216 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_45ACP_ExpLong_432_D_Best_LongSeq_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 32 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".45 ACP.csv" `
+  --model_id "V18_7d_45ACP_Collection_Category_Exp_Long_M_336_A_E_Best_Patch32_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".45 ACP" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 32 `
+  --dropout 0.15 `
+  --des "Exp18_7d_45ACP_Exp_Long_M_336_A_E_Best_Patch32_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".45 ACP.csv" `
+  --model_id "V18_7d_45ACP_Collection_Category_Deep6_240_F_Alt_2ndBase_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".45 ACP" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_45ACP_Deep6_240_F_Alt_2ndBase_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+# =========================
+# 4) .50 AE（M）
+# =========================
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".50 AE.csv" `
+  --model_id "V18_7d_50AE_Collection_Category_Opt2_192_Plateau4_A_Best_Base_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".50 AE" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_50AE_Opt2_192_Plateau4_A_Best_Base_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".50 AE.csv" `
+  --model_id "V18_7d_50AE_Collection_Category_Opt2_192_Plateau4_B_Best_LRDown_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".50 AE" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_50AE_Opt2_192_Plateau4_B_Best_LRDown_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".50 AE.csv" `
+  --model_id "V18_7d_50AE_Collection_Category_Opt2_192_Plateau4_C_Best_LRUp_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".50 AE" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_50AE_Opt2_192_Plateau4_C_Best_LRUp_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0008 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".50 AE.csv" `
+  --model_id "V18_7d_50AE_Collection_Category_Opt2_288_D_Best_LongSeq_M_288_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".50 AE" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 288 `
+  --label_len 144 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_50AE_Opt2_288_D_Best_LongSeq_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".50 AE.csv" `
+  --model_id "V18_7d_50AE_Collection_Category_Opt2_192_Plateau4_E_Best_Patch32_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".50 AE" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 32 `
+  --dropout 0.15 `
+  --des "Exp18_7d_50AE_Opt2_192_Plateau4_E_Best_Patch32_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".50 AE.csv" `
+  --model_id "V18_7d_50AE_Collection_Category_Exp_Long_M_336_A_F_Alt_2ndBase_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".50 AE" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_50AE_Exp_Long_M_336_A_F_Alt_2ndBase_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+# =========================
+# 5) 12 Gauge（M）
+# =========================
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "12 Gauge.csv" `
+  --model_id "V18_7d_12Gauge_Collection_Category_LongCtx2_384_A_Best_Base_M_384_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "12 Gauge" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 384 `
+  --label_len 192 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_12Gauge_LongCtx2_384_A_Best_Base_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "12 Gauge.csv" `
+  --model_id "V18_7d_12Gauge_Collection_Category_LongCtx2_384_B_Best_LRDown_M_384_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "12 Gauge" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 384 `
+  --label_len 192 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_12Gauge_LongCtx2_384_B_Best_LRDown_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "12 Gauge.csv" `
+  --model_id "V18_7d_12Gauge_Collection_Category_LongCtx2_384_C_Best_LRUp_M_384_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "12 Gauge" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 384 `
+  --label_len 192 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_12Gauge_LongCtx2_384_C_Best_LRUp_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0008 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "12 Gauge.csv" `
+  --model_id "V18_7d_12Gauge_Collection_Category_LongCtx2_480_D_Best_LongSeq_M_480_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "12 Gauge" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 480 `
+  --label_len 240 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_12Gauge_LongCtx2_480_D_Best_LongSeq_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 32 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "12 Gauge.csv" `
+  --model_id "V18_7d_12Gauge_Collection_Category_LongCtx2_384_E_Best_Patch32_M_384_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "12 Gauge" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 384 `
+  --label_len 192 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 32 `
+  --dropout 0.15 `
+  --des "Exp18_7d_12Gauge_LongCtx2_384_E_Best_Patch32_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "12 Gauge.csv" `
+  --model_id "V18_7d_12Gauge_Collection_Category_Deep6_240_F_Alt_2ndBase_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "12 Gauge" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_12Gauge_Deep6_240_F_Alt_2ndBase_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+# =========================
+# 6) 12.7x55mm（M）
+# =========================
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "12.7x55mm.csv" `
+  --model_id "V18_7d_127x55mm_Collection_Category_Deep6_240_A_Best_Base_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "12.7x55mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_127x55mm_Deep6_240_A_Best_Base_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "12.7x55mm.csv" `
+  --model_id "V18_7d_127x55mm_Collection_Category_Deep6_240_B_Best_LRDown_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "12.7x55mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_127x55mm_Deep6_240_B_Best_LRDown_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0002 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "12.7x55mm.csv" `
+  --model_id "V18_7d_127x55mm_Collection_Category_Deep6_240_C_Best_LRUp_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "12.7x55mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_127x55mm_Deep6_240_C_Best_LRUp_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "12.7x55mm.csv" `
+  --model_id "V18_7d_127x55mm_Collection_Category_Deep6_336_D_Best_LongSeq_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "12.7x55mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_127x55mm_Deep6_336_D_Best_LongSeq_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "12.7x55mm.csv" `
+  --model_id "V18_7d_127x55mm_Collection_Category_Deep6_240_E_Best_Patch32_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "12.7x55mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 32 `
+  --dropout 0.15 `
+  --des "Exp18_7d_127x55mm_Deep6_240_E_Best_Patch32_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0002 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "12.7x55mm.csv" `
+  --model_id "V18_7d_127x55mm_Collection_Category_Exp_Long_M_336_A_F_Alt_2ndBase_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "12.7x55mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_127x55mm_Exp_Long_M_336_A_F_Alt_2ndBase_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+# =========================
+# 7) 4.6x30mm（M）
+# =========================
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "4.6x30mm.csv" `
+  --model_id "V18_7d_46x30mm_Collection_Category_Opt2_192_Plateau4_A_Best_Base_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "4.6x30mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_46x30mm_Opt2_192_Plateau4_A_Best_Base_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "4.6x30mm.csv" `
+  --model_id "V18_7d_46x30mm_Collection_Category_Opt2_192_Plateau4_B_Best_LRDown_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "4.6x30mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_46x30mm_Opt2_192_Plateau4_B_Best_LRDown_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "4.6x30mm.csv" `
+  --model_id "V18_7d_46x30mm_Collection_Category_Opt2_192_Plateau4_C_Best_LRUp_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "4.6x30mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_46x30mm_Opt2_192_Plateau4_C_Best_LRUp_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0008 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "4.6x30mm.csv" `
+  --model_id "V18_7d_46x30mm_Collection_Category_Opt2_288_D_Best_LongSeq_M_288_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "4.6x30mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 288 `
+  --label_len 144 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_46x30mm_Opt2_288_D_Best_LongSeq_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "4.6x30mm.csv" `
+  --model_id "V18_7d_46x30mm_Collection_Category_Opt2_192_Plateau4_E_Best_Patch32_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "4.6x30mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 32 `
+  --dropout 0.15 `
+  --des "Exp18_7d_46x30mm_Opt2_192_Plateau4_E_Best_Patch32_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "4.6x30mm.csv" `
+  --model_id "V18_7d_46x30mm_Collection_Category_MidLarge_640_F_Alt_2ndBase_M_240_D640_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "4.6x30mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 640 `
+  --patch_len 16 `
+  --des "Exp18_7d_46x30mm_MidLarge_640_F_Alt_2ndBase_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+# =========================
+# 8) 45-70 Govt（M）
+# =========================
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "45-70 Govt.csv" `
+  --model_id "V18_7d_4570Govt_Collection_Category_Exp_Long_M_336_A_A_Best_Base_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "45-70 Govt" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_4570Govt_Exp_Long_M_336_A_A_Best_Base_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "45-70 Govt.csv" `
+  --model_id "V18_7d_4570Govt_Collection_Category_Exp_Long_M_336_A_B_Best_LRDown_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "45-70 Govt" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_4570Govt_Exp_Long_M_336_A_B_Best_LRDown_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "45-70 Govt.csv" `
+  --model_id "V18_7d_4570Govt_Collection_Category_Exp_Long_M_336_A_C_Best_LRUp_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "45-70 Govt" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_4570Govt_Exp_Long_M_336_A_C_Best_LRUp_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0008 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "45-70 Govt.csv" `
+  --model_id "V18_7d_4570Govt_Collection_Category_ExpLong_432_D_Best_LongSeq_M_432_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "45-70 Govt" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 432 `
+  --label_len 216 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_4570Govt_ExpLong_432_D_Best_LongSeq_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 32 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "45-70 Govt.csv" `
+  --model_id "V18_7d_4570Govt_Collection_Category_Exp_Long_M_336_A_E_Best_Patch32_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "45-70 Govt" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 32 `
+  --dropout 0.15 `
+  --des "Exp18_7d_4570Govt_Exp_Long_M_336_A_E_Best_Patch32_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "45-70 Govt.csv" `
+  --model_id "V18_7d_4570Govt_Collection_Category_LongCtx2_384_F_Alt_2ndBase_M_384_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "45-70 Govt" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 384 `
+  --label_len 192 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_4570Govt_LongCtx2_384_F_Alt_2ndBase_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+# =========================
+# 9) 5.45x39mm（M）
+# =========================
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.45x39mm.csv" `
+  --model_id "V18_7d_545x39mm_Collection_Category_MidLarge_640_A_Best_Base_M_240_D640_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.45x39mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 640 `
+  --patch_len 16 `
+  --des "Exp18_7d_545x39mm_MidLarge_640_A_Best_Base_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.45x39mm.csv" `
+  --model_id "V18_7d_545x39mm_Collection_Category_MidLarge_640_B_Best_LRDown_M_240_D640_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.45x39mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 640 `
+  --patch_len 16 `
+  --des "Exp18_7d_545x39mm_MidLarge_640_B_Best_LRDown_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.45x39mm.csv" `
+  --model_id "V18_7d_545x39mm_Collection_Category_MidLarge_640_C_Best_LRUp_M_240_D640_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.45x39mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 640 `
+  --patch_len 16 `
+  --des "Exp18_7d_545x39mm_MidLarge_640_C_Best_LRUp_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0008 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.45x39mm.csv" `
+  --model_id "V18_7d_545x39mm_Collection_Category_MidLarge_336_D_Best_LongSeq_M_336_D640_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.45x39mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 640 `
+  --patch_len 16 `
+  --des "Exp18_7d_545x39mm_MidLarge_336_D_Best_LongSeq_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 32 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.45x39mm.csv" `
+  --model_id "V18_7d_545x39mm_Collection_Category_MidLarge_640_E_Best_Patch32_M_240_D640_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.45x39mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 640 `
+  --patch_len 32 `
+  --dropout 0.15 `
+  --des "Exp18_7d_545x39mm_MidLarge_640_E_Best_Patch32_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.45x39mm.csv" `
+  --model_id "V18_7d_545x39mm_Collection_Category_Exp_Long_M_336_A_F_Alt_2ndBase_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.45x39mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_545x39mm_Exp_Long_M_336_A_F_Alt_2ndBase_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+# =========================
+# 10) 5.56x45mm（M）
+# =========================
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.56x45mm.csv" `
+  --model_id "V18_7d_556x45mm_Collection_Category_Exp_Long_M_336_A_A_Best_Base_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.56x45mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_556x45mm_Exp_Long_M_336_A_A_Best_Base_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.56x45mm.csv" `
+  --model_id "V18_7d_556x45mm_Collection_Category_Exp_Long_M_336_A_B_Best_LRDown_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.56x45mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_556x45mm_Exp_Long_M_336_A_B_Best_LRDown_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.56x45mm.csv" `
+  --model_id "V18_7d_556x45mm_Collection_Category_Exp_Long_M_336_A_C_Best_LRUp_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.56x45mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_556x45mm_Exp_Long_M_336_A_C_Best_LRUp_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0008 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.56x45mm.csv" `
+  --model_id "V18_7d_556x45mm_Collection_Category_ExpLong_432_D_Best_LongSeq_M_432_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.56x45mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 432 `
+  --label_len 216 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_556x45mm_ExpLong_432_D_Best_LongSeq_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 32 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.56x45mm.csv" `
+  --model_id "V18_7d_556x45mm_Collection_Category_Exp_Long_M_336_A_E_Best_Patch32_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.56x45mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 32 `
+  --dropout 0.15 `
+  --des "Exp18_7d_556x45mm_Exp_Long_M_336_A_E_Best_Patch32_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.56x45mm.csv" `
+  --model_id "V18_7d_556x45mm_Collection_Category_LongCtx2_384_F_Alt_2ndBase_M_384_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.56x45mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 384 `
+  --label_len 192 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_556x45mm_LongCtx2_384_F_Alt_2ndBase_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+# =========================
+# 11) 5.7x28mm（M）
+# =========================
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.7x28mm.csv" `
+  --model_id "V18_7d_57x28mm_Collection_Category_Deep6_240_A_Best_Base_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.7x28mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_57x28mm_Deep6_240_A_Best_Base_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.7x28mm.csv" `
+  --model_id "V18_7d_57x28mm_Collection_Category_Deep6_240_B_Best_LRDown_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.7x28mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_57x28mm_Deep6_240_B_Best_LRDown_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0002 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.7x28mm.csv" `
+  --model_id "V18_7d_57x28mm_Collection_Category_Deep6_240_C_Best_LRUp_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.7x28mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_57x28mm_Deep6_240_C_Best_LRUp_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.7x28mm.csv" `
+  --model_id "V18_7d_57x28mm_Collection_Category_Deep6_336_D_Best_LongSeq_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.7x28mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_57x28mm_Deep6_336_D_Best_LongSeq_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.7x28mm.csv" `
+  --model_id "V18_7d_57x28mm_Collection_Category_Deep6_240_E_Best_Patch32_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.7x28mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 32 `
+  --dropout 0.15 `
+  --des "Exp18_7d_57x28mm_Deep6_240_E_Best_Patch32_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0002 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.7x28mm.csv" `
+  --model_id "V18_7d_57x28mm_Collection_Category_Opt2_192_Plateau4_F_Alt_2ndBase_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.7x28mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_57x28mm_Opt2_192_Plateau4_F_Alt_2ndBase_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+# =========================
+# 12) 5.8x42mm（M）
+# =========================
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.8x42mm.csv" `
+  --model_id "V18_7d_58x42mm_Collection_Category_Deep6_240_A_Best_Base_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.8x42mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_58x42mm_Deep6_240_A_Best_Base_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.8x42mm.csv" `
+  --model_id "V18_7d_58x42mm_Collection_Category_Deep6_240_B_Best_LRDown_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.8x42mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_58x42mm_Deep6_240_B_Best_LRDown_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0002 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.8x42mm.csv" `
+  --model_id "V18_7d_58x42mm_Collection_Category_Deep6_240_C_Best_LRUp_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.8x42mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_58x42mm_Deep6_240_C_Best_LRUp_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.8x42mm.csv" `
+  --model_id "V18_7d_58x42mm_Collection_Category_Deep6_336_D_Best_LongSeq_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.8x42mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_58x42mm_Deep6_336_D_Best_LongSeq_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.8x42mm.csv" `
+  --model_id "V18_7d_58x42mm_Collection_Category_Deep6_240_E_Best_Patch32_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.8x42mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 32 `
+  --dropout 0.15 `
+  --des "Exp18_7d_58x42mm_Deep6_240_E_Best_Patch32_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0002 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.8x42mm.csv" `
+  --model_id "V18_7d_58x42mm_Collection_Category_MidLarge_640_F_Alt_2ndBase_M_240_D640_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.8x42mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 640 `
+  --patch_len 16 `
+  --des "Exp18_7d_58x42mm_MidLarge_640_F_Alt_2ndBase_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+# =========================
+# 13) 6.8x51mm（M）
+# =========================
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "6.8x51mm.csv" `
+  --model_id "V18_7d_68x51mm_Collection_Category_Deep6_240_A_Best_Base_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "6.8x51mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_68x51mm_Deep6_240_A_Best_Base_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "6.8x51mm.csv" `
+  --model_id "V18_7d_68x51mm_Collection_Category_Deep6_240_B_Best_LRDown_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "6.8x51mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_68x51mm_Deep6_240_B_Best_LRDown_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0002 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "6.8x51mm.csv" `
+  --model_id "V18_7d_68x51mm_Collection_Category_Deep6_240_C_Best_LRUp_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "6.8x51mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_68x51mm_Deep6_240_C_Best_LRUp_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "6.8x51mm.csv" `
+  --model_id "V18_7d_68x51mm_Collection_Category_Deep6_336_D_Best_LongSeq_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "6.8x51mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_68x51mm_Deep6_336_D_Best_LongSeq_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "6.8x51mm.csv" `
+  --model_id "V18_7d_68x51mm_Collection_Category_Deep6_240_E_Best_Patch32_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "6.8x51mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 32 `
+  --dropout 0.15 `
+  --des "Exp18_7d_68x51mm_Deep6_240_E_Best_Patch32_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0002 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "6.8x51mm.csv" `
+  --model_id "V18_7d_68x51mm_Collection_Category_Opt2_192_Plateau4_F_Alt_2ndBase_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "6.8x51mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_68x51mm_Opt2_192_Plateau4_F_Alt_2ndBase_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+# =========================
+# 14) 7.62x39mm（M）
+# =========================
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "7.62x39mm.csv" `
+  --model_id "V18_7d_762x39mm_Collection_Category_Opt2_192_Plateau4_A_Best_Base_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "7.62x39mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_762x39mm_Opt2_192_Plateau4_A_Best_Base_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "7.62x39mm.csv" `
+  --model_id "V18_7d_762x39mm_Collection_Category_Opt2_192_Plateau4_B_Best_LRDown_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "7.62x39mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_762x39mm_Opt2_192_Plateau4_B_Best_LRDown_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "7.62x39mm.csv" `
+  --model_id "V18_7d_762x39mm_Collection_Category_Opt2_192_Plateau4_C_Best_LRUp_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "7.62x39mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_762x39mm_Opt2_192_Plateau4_C_Best_LRUp_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0008 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "7.62x39mm.csv" `
+  --model_id "V18_7d_762x39mm_Collection_Category_Opt2_288_D_Best_LongSeq_M_288_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "7.62x39mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 288 `
+  --label_len 144 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_762x39mm_Opt2_288_D_Best_LongSeq_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "7.62x39mm.csv" `
+  --model_id "V18_7d_762x39mm_Collection_Category_Opt2_192_Plateau4_E_Best_Patch32_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "7.62x39mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 32 `
+  --dropout 0.15 `
+  --des "Exp18_7d_762x39mm_Opt2_192_Plateau4_E_Best_Patch32_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "7.62x39mm.csv" `
+  --model_id "V18_7d_762x39mm_Collection_Category_Deep6_240_F_Alt_2ndBase_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "7.62x39mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_762x39mm_Deep6_240_F_Alt_2ndBase_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+# =========================
+# 15) 7.62x51mm（M）
+# =========================
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "7.62x51mm.csv" `
+  --model_id "V18_7d_762x51mm_Collection_Category_Deep6_240_A_Best_Base_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "7.62x51mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_762x51mm_Deep6_240_A_Best_Base_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "7.62x51mm.csv" `
+  --model_id "V18_7d_762x51mm_Collection_Category_Deep6_240_B_Best_LRDown_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "7.62x51mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_762x51mm_Deep6_240_B_Best_LRDown_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0002 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "7.62x51mm.csv" `
+  --model_id "V18_7d_762x51mm_Collection_Category_Deep6_240_C_Best_LRUp_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "7.62x51mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_762x51mm_Deep6_240_C_Best_LRUp_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "7.62x51mm.csv" `
+  --model_id "V18_7d_762x51mm_Collection_Category_Deep6_336_D_Best_LongSeq_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "7.62x51mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_762x51mm_Deep6_336_D_Best_LongSeq_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "7.62x51mm.csv" `
+  --model_id "V18_7d_762x51mm_Collection_Category_Deep6_240_E_Best_Patch32_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "7.62x51mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 32 `
+  --dropout 0.15 `
+  --des "Exp18_7d_762x51mm_Deep6_240_E_Best_Patch32_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0002 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "7.62x51mm.csv" `
+  --model_id "V18_7d_762x51mm_Collection_Category_Opt2_192_Plateau4_F_Alt_2ndBase_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "7.62x51mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_762x51mm_Opt2_192_Plateau4_F_Alt_2ndBase_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+# =========================
+# 16) 7.62x54R（M）
+# =========================
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "7.62x54R.csv" `
+  --model_id "V18_7d_762x54R_Collection_Category_Exp_Long_M_336_A_A_Best_Base_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "7.62x54R" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_762x54R_Exp_Long_M_336_A_A_Best_Base_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "7.62x54R.csv" `
+  --model_id "V18_7d_762x54R_Collection_Category_Exp_Long_M_336_A_B_Best_LRDown_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "7.62x54R" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_762x54R_Exp_Long_M_336_A_B_Best_LRDown_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "7.62x54R.csv" `
+  --model_id "V18_7d_762x54R_Collection_Category_Exp_Long_M_336_A_C_Best_LRUp_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "7.62x54R" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_762x54R_Exp_Long_M_336_A_C_Best_LRUp_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0008 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "7.62x54R.csv" `
+  --model_id "V18_7d_762x54R_Collection_Category_ExpLong_432_D_Best_LongSeq_M_432_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "7.62x54R" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 432 `
+  --label_len 216 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_762x54R_ExpLong_432_D_Best_LongSeq_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 32 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "7.62x54R.csv" `
+  --model_id "V18_7d_762x54R_Collection_Category_Exp_Long_M_336_A_E_Best_Patch32_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "7.62x54R" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 32 `
+  --dropout 0.15 `
+  --des "Exp18_7d_762x54R_Exp_Long_M_336_A_E_Best_Patch32_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "7.62x54R.csv" `
+  --model_id "V18_7d_762x54R_Collection_Category_LongCtx2_384_F_Alt_2ndBase_M_384_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "7.62x54R" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 384 `
+  --label_len 192 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_762x54R_LongCtx2_384_F_Alt_2ndBase_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+# =========================
+# 17) 9x19mm（M）
+# =========================
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "9x19mm.csv" `
+  --model_id "V18_7d_9x19mm_Collection_Category_MidLarge_640_A_Best_Base_M_240_D640_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "9x19mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 640 `
+  --patch_len 16 `
+  --des "Exp18_7d_9x19mm_MidLarge_640_A_Best_Base_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "9x19mm.csv" `
+  --model_id "V18_7d_9x19mm_Collection_Category_MidLarge_640_B_Best_LRDown_M_240_D640_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "9x19mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 640 `
+  --patch_len 16 `
+  --des "Exp18_7d_9x19mm_MidLarge_640_B_Best_LRDown_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "9x19mm.csv" `
+  --model_id "V18_7d_9x19mm_Collection_Category_MidLarge_640_C_Best_LRUp_M_240_D640_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "9x19mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 640 `
+  --patch_len 16 `
+  --des "Exp18_7d_9x19mm_MidLarge_640_C_Best_LRUp_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0008 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "9x19mm.csv" `
+  --model_id "V18_7d_9x19mm_Collection_Category_MidLarge_336_D_Best_LongSeq_M_336_D640_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "9x19mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 640 `
+  --patch_len 16 `
+  --des "Exp18_7d_9x19mm_MidLarge_336_D_Best_LongSeq_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 32 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "9x19mm.csv" `
+  --model_id "V18_7d_9x19mm_Collection_Category_MidLarge_640_E_Best_Patch32_M_240_D640_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "9x19mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 640 `
+  --patch_len 32 `
+  --dropout 0.15 `
+  --des "Exp18_7d_9x19mm_MidLarge_640_E_Best_Patch32_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "9x19mm.csv" `
+  --model_id "V18_7d_9x19mm_Collection_Category_Opt2_192_Plateau4_F_Alt_2ndBase_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "9x19mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_9x19mm_Opt2_192_Plateau4_F_Alt_2ndBase_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+# =========================
+# 18) 9x39mm（M）
+# =========================
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "9x39mm.csv" `
+  --model_id "V18_7d_9x39mm_Collection_Category_Opt2_192_Plateau4_A_Best_Base_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "9x39mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_9x39mm_Opt2_192_Plateau4_A_Best_Base_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "9x39mm.csv" `
+  --model_id "V18_7d_9x39mm_Collection_Category_Opt2_192_Plateau4_B_Best_LRDown_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "9x39mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_9x39mm_Opt2_192_Plateau4_B_Best_LRDown_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "9x39mm.csv" `
+  --model_id "V18_7d_9x39mm_Collection_Category_Opt2_192_Plateau4_C_Best_LRUp_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "9x39mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_9x39mm_Opt2_192_Plateau4_C_Best_LRUp_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0008 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "9x39mm.csv" `
+  --model_id "V18_7d_9x39mm_Collection_Category_Opt2_288_D_Best_LongSeq_M_288_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "9x39mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 288 `
+  --label_len 144 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_9x39mm_Opt2_288_D_Best_LongSeq_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "9x39mm.csv" `
+  --model_id "V18_7d_9x39mm_Collection_Category_Opt2_192_Plateau4_E_Best_Patch32_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "9x39mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 32 `
+  --dropout 0.15 `
+  --des "Exp18_7d_9x39mm_Opt2_192_Plateau4_E_Best_Patch32_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "9x39mm.csv" `
+  --model_id "V18_7d_9x39mm_Collection_Category_LongCtx2_384_F_Alt_2ndBase_M_384_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "9x39mm" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 384 `
+  --label_len 192 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_9x39mm_LongCtx2_384_F_Alt_2ndBase_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 2 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+# =========================
+# 19) 箭矢（M）
+# =========================
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "箭矢.csv" `
+  --model_id "V18_7d_Arrow_Collection_Category_Deep6_240_A_Best_Base_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "箭矢" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_Arrow_Deep6_240_A_Best_Base_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "箭矢.csv" `
+  --model_id "V18_7d_Arrow_Collection_Category_Deep6_240_B_Best_LRDown_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "箭矢" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_Arrow_Deep6_240_B_Best_LRDown_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0002 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "箭矢.csv" `
+  --model_id "V18_7d_Arrow_Collection_Category_Deep6_240_C_Best_LRUp_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "箭矢" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_Arrow_Deep6_240_C_Best_LRUp_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "箭矢.csv" `
+  --model_id "V18_7d_Arrow_Collection_Category_Deep6_336_D_Best_LongSeq_M_336_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "箭矢" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_Arrow_Deep6_336_D_Best_LongSeq_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0003 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "箭矢.csv" `
+  --model_id "V18_7d_Arrow_Collection_Category_Deep6_240_E_Best_Patch32_M_240_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "箭矢" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 240 `
+  --label_len 120 `
+  --pred_len 168 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 32 `
+  --dropout 0.15 `
+  --des "Exp18_7d_Arrow_Deep6_240_E_Best_Patch32_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0002 `
+  --lradj type3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0 && `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "E:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "箭矢.csv" `
+  --model_id "V18_7d_Arrow_Collection_Category_Opt2_192_Plateau4_F_Alt_2ndBase_M_192_D512_P168" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "箭矢" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 168 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --patch_len 16 `
+  --des "Exp18_7d_Arrow_Opt2_192_Plateau4_F_Alt_2ndBase_M" `
+  --itr 1 `
+  --train_epochs 400 `
+  --patience 30 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --lradj plateau `
+  --plateau_patience 3 `
+  --num_workers 0 `
+  --use_amp `
+  --use_gpu True `
+  --gpu 0
+
+```

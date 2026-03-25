@@ -55,5 +55,10 @@ yarn-error.log
 
 # Project specific (Data files that might be too large or sensitive)
 毕设文档集/
-测试新子弹价格数据/子弹数据/
+Datasets/daily Dataset/
 TimeXer/backup/
+Datasets/__pycache__/
+TimeXer/checkpoints/
+TimeXer/results/
+TimeXer/test_results/
+TimeXer/result_long_term_forecast.txt

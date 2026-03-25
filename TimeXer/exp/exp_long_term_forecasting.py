@@ -19,8 +19,15 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         super(Exp_Long_Term_Forecast, self).__init__(args)
 
     def _align_outputs_and_y(self, outputs, batch_y):
-        target_dim = batch_y.shape[-1]
         out_dim = outputs.shape[-1]
+        target_dim = batch_y.shape[-1]
+        
+        # In case batch_y includes both targets and exogenous variables
+        # the model only outputs predictions for targets.
+        if self.args.features == 'M' and out_dim < target_dim:
+            batch_y = batch_y[:, :, :out_dim]
+            target_dim = out_dim
+            
         if out_dim < target_dim:
             raise RuntimeError(
                 f"Model output channel mismatch: outputs.shape[-1]={out_dim} < batch_y.shape[-1]={target_dim} "
@@ -65,8 +72,12 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 batch_y_mark = batch_y_mark.float().to(self.device)
 
                 # decoder input
-                dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
-                dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
+                dec_inp_future = batch_y[:, -self.args.pred_len:, :].clone().float()
+                target_dim = self.args.c_out
+                # 仅将预测窗口内的“目标变量”列置零，保留“外生变量”的真实未来值
+                dec_inp_future[:, :, :target_dim] = 0.0
+                dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp_future], dim=1).float().to(self.device)
+                
                 # encoder - decoder
                 if self.args.use_amp:
                     with torch.cuda.amp.autocast():
@@ -112,7 +123,7 @@ class Exp_Long_Term_Forecast(Exp_Basic):
         criterion = self._select_criterion()
 
         if self.args.lradj == 'plateau':
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(model_optim, mode='min', patience=2, factor=0.5, verbose=True)
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(model_optim, mode='min', patience=2, factor=0.5)
 
         if self.args.use_amp:
             scaler = torch.cuda.amp.GradScaler()
@@ -133,8 +144,11 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 batch_y_mark = batch_y_mark.float().to(self.device)
 
                 # decoder input
-                dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
-                dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
+                dec_inp_future = batch_y[:, -self.args.pred_len:, :].clone().float()
+                target_dim = self.args.c_out
+                # 仅将预测窗口内的“目标变量”列置零，保留“外生变量”的真实未来值
+                dec_inp_future[:, :, :target_dim] = 0.0
+                dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp_future], dim=1).float().to(self.device)
 
                 # encoder - decoder
                 if self.args.use_amp:
@@ -223,8 +237,11 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                 batch_y_mark = batch_y_mark.float().to(self.device)
 
                 # decoder input
-                dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
-                dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp], dim=1).float().to(self.device)
+                dec_inp_future = batch_y[:, -self.args.pred_len:, :].clone().float()
+                target_dim = self.args.c_out
+                # 仅将预测窗口内的“目标变量”列置零，保留“外生变量”的真实未来值
+                dec_inp_future[:, :, :target_dim] = 0.0
+                dec_inp = torch.cat([batch_y[:, :self.args.label_len, :], dec_inp_future], dim=1).float().to(self.device)
                 # encoder - decoder
                 if self.args.use_amp:
                     with torch.cuda.amp.autocast():

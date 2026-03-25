@@ -49,11 +49,11 @@ def _timexer_root():
 
 
 def _default_data_dir():
-    return os.path.join(_project_root(), "测试新子弹价格数据", "总子弹数据")
+    return os.path.join(_project_root(), "Datasets", "Datasets")
 
 
 def _default_category_exog_dir():
-    return os.path.join(_project_root(), "测试新子弹价格数据", "带外生变量的总子弹数据")
+    return os.path.join(_project_root(), "Datasets", "Datasets with Exogenous")
 
 
 MODEL_CONFIGS = {
@@ -323,6 +323,198 @@ def _read_category_exog_info(category_exog_dir: str, category_csv: str):
     return category_path, target_cols, present_exog, input_cols
 
 
+def get_aliases(name: str) -> set[str]:
+    names = {_norm_text(name)}
+    ALIAS_MAP = {
+        "arrow 3": "玻纤柳叶箭矢",
+        "玻纤柳叶箭矢": "arrow 3",
+        "arrow 4": "碳纤维刺骨箭矢",
+        "碳纤维刺骨箭矢": "arrow 4",
+        "arrow 5": "碳纤维穿甲箭矢",
+        "碳纤维穿甲箭矢": "arrow 5",
+    }
+    if name in ALIAS_MAP:
+        names.add(_norm_text(ALIAS_MAP[name]))
+    return names
+
+
+def parse_chinese_date(date_str):
+    try:
+        match = re.match(r"(\d+)年(\d+)月(\d+)日", str(date_str))
+        if match:
+            from datetime import datetime
+            return datetime(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    except Exception:
+        pass
+    return None
+
+
+def load_configs(exo_dir: str):
+    import pandas as pd
+    from datetime import datetime, timedelta
+    holiday_path = os.path.join(exo_dir, "China_Holiday_2025_2026.csv")
+    season_path = os.path.join(exo_dir, "赛季时间.csv")
+    gun_event_path = os.path.join(exo_dir, "品枪时间.csv")
+    prediction_path = os.path.join(exo_dir, "predictions.csv")
+
+    holiday_map = {}
+    try:
+        holidays_df = pd.read_csv(holiday_path)
+        for _, row in holidays_df.iterrows():
+            try:
+                d = pd.to_datetime(row["date"]).date()
+                holiday_map[d] = int(row["is_holiday"])
+            except Exception:
+                pass
+    except Exception:
+        holiday_map = {}
+
+    seasons = []
+    try:
+        seasons_df = pd.read_csv(season_path)
+        for _, row in seasons_df.iterrows():
+            s_name = str(row.get("赛季名称", ""))
+            s_id = 0
+            if "s6" in s_name.lower():
+                s_id = 1
+            if "s7" in s_name.lower():
+                s_id = 2
+
+            start_date = parse_chinese_date(row.get("赛季开始"))
+            end_date_raw = parse_chinese_date(row.get("赛季结束"))
+            if not start_date or not end_date_raw:
+                continue
+            end_date = end_date_raw + timedelta(days=1)
+
+            needed_raw = row.get("赛季任务所需子弹")
+            made_raw = row.get("制造子弹")
+            needed = str(needed_raw).split(";") if pd.notna(needed_raw) else []
+            made = str(made_raw).split(";") if pd.notna(made_raw) else []
+
+            seasons.append(
+                {
+                    "id": s_id,
+                    "start": start_date,
+                    "end": end_date,
+                    "needed": [str(x).strip() for x in needed if str(x).strip()],
+                    "made": [str(x).strip() for x in made if str(x).strip()],
+                }
+            )
+    except Exception:
+        pass
+
+    gun_events = []
+    try:
+        gun_events_df = pd.read_csv(gun_event_path)
+        for _, row in gun_events_df.iterrows():
+            time_range = str(row.get("时间", ""))
+            bullets = str(row.get("所用子弹", "")).strip()
+            try:
+                start_str, _ = time_range.split("-")
+            except Exception:
+                continue
+
+            def parse_md(s: str):
+                m, d = map(int, str(s).split("."))
+                y = 2025 if m >= 9 else 2026
+                return datetime(y, m, d)
+
+            try:
+                s_date = parse_md(start_str)
+            except Exception:
+                continue
+
+            active_start = s_date - timedelta(days=2)
+            active_end = s_date + timedelta(days=2)
+            active_end_exclusive = active_end + timedelta(days=1)
+            gun_events.append({"start": active_start, "end": active_end_exclusive, "bullet": bullets})
+    except Exception:
+        pass
+
+    predictions = []
+    try:
+        pred_df = pd.read_csv(prediction_path)
+        for _, row in pred_df.iterrows():
+            try:
+                t = pd.to_datetime(row["time"])
+                n = str(row["name"])
+                predictions.append({"time": t.to_pydatetime(), "name": n})
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    return holiday_map, seasons, gun_events, predictions
+
+
+def get_is_holiday(dt, holiday_map: dict) -> int:
+    return int(holiday_map.get(dt.date(), 0))
+
+
+def get_season_data(dt, bullet_name: str, seasons: list[dict]):
+    in_cs = 0.0
+    is_cs = 0
+    is_need = 0
+    is_make = 0
+    aliases = get_aliases(bullet_name)
+    for s in seasons:
+        if s["start"] <= dt < s["end"]:
+            total_duration = (s["end"] - s["start"]).total_seconds()
+            elapsed = (dt - s["start"]).total_seconds()
+            val = elapsed / total_duration if total_duration > 0 else 0
+            val = max(0.0, min(1.0, val))
+            in_cs = float(val)
+            is_cs = int(s["id"])
+
+            for nb in s["needed"]:
+                for alias in aliases:
+                    if str(nb) in str(alias):
+                        is_need = 1
+                        break
+                if is_need:
+                    break
+
+            for mb in s["made"]:
+                for alias in aliases:
+                    if str(mb) in str(alias):
+                        is_make = 1
+                        break
+                if is_make:
+                    break
+            break
+    return in_cs, is_cs, is_need, is_make
+
+
+def get_is_active(dt, bullet_name: str, gun_events: list[dict]) -> int:
+    aliases = get_aliases(bullet_name)
+    for ev in gun_events:
+        if ev["start"] <= dt < ev["end"]:
+            for alias in aliases:
+                if str(ev["bullet"]) in str(alias):
+                    return 1
+    return 0
+
+
+def get_is_public(dt, bullet_name: str, predictions: list[dict]) -> float:
+    val = 0.0
+    aliases = get_aliases(bullet_name)
+    for p in predictions:
+        match = False
+        for alias in aliases:
+            if str(p["name"]) in str(alias):
+                match = True
+                break
+        if not match:
+            continue
+        delta = dt - p["time"]
+        days_diff = delta.total_seconds() / (24 * 3600)
+        if 0 <= days_diff <= 60:
+            curr_val = 1.0 - (days_diff / 60.0)
+            if curr_val > val:
+                val = float(curr_val)
+    return float(val)
+
+
 def _norm_text(s):
     return unicodedata.normalize("NFKC", str(s)).strip().lstrip("\ufeff")
 
@@ -471,8 +663,46 @@ class TimeXerRunner:
         batch_x = torch.from_numpy(x[None, :, :]).float().to(exp.device)
         batch_x_mark = torch.from_numpy(x_mark[None, :, :]).float().to(exp.device)
         batch_y_mark = torch.from_numpy(y_mark[None, :, :]).float().to(exp.device)
-        dec_zeros = torch.zeros((1, pred_len, y_label.shape[1]), dtype=torch.float32, device=exp.device)
-        dec_inp = torch.cat([torch.from_numpy(y_label[None, :, :]).float().to(exp.device), dec_zeros], dim=1)
+        
+        # Build future exogenous features
+        if category_exog_dir and target_count < values_x.shape[1]:
+            holiday_map, seasons, gun_events, predictions = load_configs(category_exog_dir)
+            future_exog = []
+            for dt in future_times:
+                inc, isc, isn, ism = get_season_data(dt, bullet_n, seasons)
+                row_exog = [
+                    get_is_holiday(dt, holiday_map),
+                    inc,
+                    isc,
+                    isn,
+                    ism,
+                    get_is_active(dt, bullet_n, gun_events),
+                    get_is_public(dt, bullet_n, predictions)
+                ]
+                future_exog.append(row_exog)
+            future_exog = np.array(future_exog, dtype=np.float32)
+            
+            # Construct a full matrix (targets + exog) to scale it properly
+            future_full = np.zeros((pred_len, values_x.shape[1]), dtype=np.float32)
+            exog_start_idx = target_count
+            
+            # Map calculated exog values to the correct columns based on input_cols
+            exog_idx_map = {c: i for i, c in enumerate(EXOG_COLS)}
+            for i, c in enumerate(input_cols[target_count:]):
+                if c in exog_idx_map:
+                    future_full[:, target_count + i] = future_exog[:, exog_idx_map[c]]
+            
+            # Scale future exogenous variables
+            future_scaled = scaler.transform(future_full).astype(np.float32)
+            
+            # Zero out targets, keep scaled exog
+            dec_future = np.zeros((1, pred_len, values_x.shape[1]), dtype=np.float32)
+            dec_future[0, :, target_count:] = future_scaled[:, target_count:]
+            dec_zeros = torch.from_numpy(dec_future).float().to(exp.device)
+            dec_inp = torch.cat([torch.from_numpy(y_label[None, :, :]).float().to(exp.device), dec_zeros], dim=1)
+        else:
+            dec_zeros = torch.zeros((1, pred_len, y_label.shape[1]), dtype=torch.float32, device=exp.device)
+            dec_inp = torch.cat([torch.from_numpy(y_label[None, :, :]).float().to(exp.device), dec_zeros], dim=1)
 
         with torch.no_grad():
             outputs = exp.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)

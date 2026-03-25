@@ -1,0 +1,748 @@
+# 训练命令14：Category vs Solo 对比实验（统一训练 vs 分开训练）
+
+本文件用于对比两种训练策略在 **5.56mm / .300BLK / 箭矢** 三类数据上的效果：
+
+- **Category（统一训练）**：`collection_category` 中同类子弹的多个子弹价格列一起训练（`--features M` 会对所有目标列共同计算 loss 并反向传播；外生列不参与预测与 loss）。
+- **Solo（分开训练）**：`collection_solo` 中每个 CSV 只有单一目标列 `OT`，每个子弹分别训练（仍使用 `--features M`，此时目标列集合仅 `OT`）。
+
+---
+
+# 批量执行命令（每类子弹 2 套参数 × Category/Solo）
+
+- 5.56mm：A=Opt2 基线（192/96/72），B=长上下文（336/168/72）
+- .300BLK：A=Opt2 基线（192/96/72），B=深层网络（e_layers=6）
+- 箭矢：A=Opt2 基线（256/96/72），B=超长序列（512/256/72）
+
+```powershell
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.56x45mm.csv" `
+  --model_id "CatVsSolo_556_Category_Opt2_M_192_A" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.56x45mm M855" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_556_Category_A" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_solo" `
+  --data_path "5.56x45mm FMJ.csv" `
+  --model_id "CatVsSolo_556_Solo_FMJ_Opt2_M_192_A" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "OT" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_556_Solo_A" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 5
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_solo" `
+  --data_path "5.56x45mm M855.csv" `
+  --model_id "CatVsSolo_556_Solo_M855_Opt2_M_192_A" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "OT" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_556_Solo_A" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 1
+
+&& `
+
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_solo" `
+  --data_path "5.56x45mm M855A1.csv" `
+  --model_id "CatVsSolo_556_Solo_M855A1_Opt2_M_192_A" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "OT" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_556_Solo_A" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_solo" `
+  --data_path "5.56x45mm M995.csv" `
+  --model_id "CatVsSolo_556_Solo_M995_Opt2_M_192_A" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "OT" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_556_Solo_A" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_solo" `
+  --data_path "5.56x45mm RRLP.csv" `
+  --model_id "CatVsSolo_556_Solo_RRLP_Opt2_M_192_A" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "OT" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_556_Solo_A" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "5.56x45mm.csv" `
+  --model_id "CatVsSolo_556_Category_LongCtx_M_336_B" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "5.56x45mm M855" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_556_Category_B" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_solo" `
+  --data_path "5.56x45mm FMJ.csv" `
+  --model_id "CatVsSolo_556_Solo_FMJ_LongCtx_M_336_B" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "OT" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_556_Solo_B" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_solo" `
+  --data_path "5.56x45mm M855.csv" `
+  --model_id "CatVsSolo_556_Solo_M855_LongCtx_M_336_B" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "OT" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_556_Solo_B" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_solo" `
+  --data_path "5.56x45mm M855A1.csv" `
+  --model_id "CatVsSolo_556_Solo_M855A1_LongCtx_M_336_B" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "OT" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_556_Solo_B" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_solo" `
+  --data_path "5.56x45mm M995.csv" `
+  --model_id "CatVsSolo_556_Solo_M995_LongCtx_M_336_B" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "OT" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_556_Solo_B" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_solo" `
+  --data_path "5.56x45mm RRLP.csv" `
+  --model_id "CatVsSolo_556_Solo_RRLP_LongCtx_M_336_B" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "OT" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 336 `
+  --label_len 168 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_556_Solo_B" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".300BLK.csv" `
+  --model_id "CatVsSolo_300BLK_Category_Opt2_M_192_A" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".300BLK 3" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_300BLK_Category_A" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_solo" `
+  --data_path ".300BLK 3.csv" `
+  --model_id "CatVsSolo_300BLK_Solo_3_Opt2_M_192_A" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "OT" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_300BLK_Solo_A" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_solo" `
+  --data_path ".300BLK 4.csv" `
+  --model_id "CatVsSolo_300BLK_Solo_4_Opt2_M_192_A" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "OT" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_300BLK_Solo_A" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_solo" `
+  --data_path ".300BLK 5.csv" `
+  --model_id "CatVsSolo_300BLK_Solo_5_Opt2_M_192_A" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "OT" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_300BLK_Solo_A" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path ".300BLK.csv" `
+  --model_id "CatVsSolo_300BLK_Category_Deep_M_L6_B" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target ".300BLK 3" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 72 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_300BLK_Category_B" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_solo" `
+  --data_path ".300BLK 3.csv" `
+  --model_id "CatVsSolo_300BLK_Solo_3_Deep_M_L6_B" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "OT" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 72 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_300BLK_Solo_B" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_solo" `
+  --data_path ".300BLK 4.csv" `
+  --model_id "CatVsSolo_300BLK_Solo_4_Deep_M_L6_B" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "OT" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 72 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_300BLK_Solo_B" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_solo" `
+  --data_path ".300BLK 5.csv" `
+  --model_id "CatVsSolo_300BLK_Solo_5_Deep_M_L6_B" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "OT" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 192 `
+  --label_len 96 `
+  --pred_len 72 `
+  --e_layers 6 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_300BLK_Solo_B" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "箭矢.csv" `
+  --model_id "CatVsSolo_Arrow_Category_Opt2_M_256_A" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "玻纤柳叶箭矢" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 256 `
+  --label_len 96 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_Arrow_Category_A" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_solo" `
+  --data_path "玻纤柳叶箭矢.csv" `
+  --model_id "CatVsSolo_Arrow_Solo_GlassLeaf_Opt2_M_256_A" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "OT" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 256 `
+  --label_len 96 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_Arrow_Solo_A" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_solo" `
+  --data_path "碳纤维刺骨箭矢.csv" `
+  --model_id "CatVsSolo_Arrow_Solo_CarbonBodkin_Opt2_M_256_A" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "OT" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 256 `
+  --label_len 96 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_Arrow_Solo_A" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_solo" `
+  --data_path "碳纤维穿甲箭矢.csv" `
+  --model_id "CatVsSolo_Arrow_Solo_CarbonAP_Opt2_M_256_A" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "OT" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 256 `
+  --label_len 96 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_Arrow_Solo_A" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_category" `
+  --data_path "箭矢.csv" `
+  --model_id "CatVsSolo_Arrow_Category_Ultra_M_512_B" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "玻纤柳叶箭矢" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 512 `
+  --label_len 256 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_Arrow_Category_B" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_solo" `
+  --data_path "玻纤柳叶箭矢.csv" `
+  --model_id "CatVsSolo_Arrow_Solo_GlassLeaf_Ultra_M_512_B" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "OT" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 512 `
+  --label_len 256 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_Arrow_Solo_B" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_solo" `
+  --data_path "碳纤维刺骨箭矢.csv" `
+  --model_id "CatVsSolo_Arrow_Solo_CarbonBodkin_Ultra_M_512_B" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "OT" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 512 `
+  --label_len 256 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_Arrow_Solo_B" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0 && `
+python run.py `
+  --task_name long_term_forecast `
+  --is_training 1 `
+  --root_path "e:\大四\毕设\学习\TimeXer-main\dataset\bullet\collection_solo" `
+  --data_path "碳纤维穿甲箭矢.csv" `
+  --model_id "CatVsSolo_Arrow_Solo_CarbonAP_Ultra_M_512_B" `
+  --model TimeXer `
+  --data custom `
+  --features M `
+  --target "OT" `
+  --freq "h" `
+  --checkpoints "./checkpoints/" `
+  --seq_len 512 `
+  --label_len 256 `
+  --pred_len 72 `
+  --e_layers 4 `
+  --d_layers 2 `
+  --factor 3 `
+  --d_model 512 `
+  --des "CatVsSolo_Arrow_Solo_B" `
+  --itr 1 `
+  --batch_size 64 `
+  --learning_rate 0.0005 `
+  --use_gpu True `
+  --gpu 0 `
+  --num_workers 0
+```

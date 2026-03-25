@@ -133,6 +133,9 @@ class Model(nn.Module):
 
         self.ex_embedding = DataEmbedding_inverted(configs.seq_len, configs.d_model, configs.embed, configs.freq,
                                                    configs.dropout)
+        
+        # New embedding for exogenous variables that span both historical and future windows
+        self.ex_embedding_future = DataEmbedding_inverted(configs.seq_len + configs.pred_len, configs.d_model, configs.embed, configs.freq, configs.dropout)
 
         # Encoder-only architecture
         self.encoder = Encoder(
@@ -196,12 +199,39 @@ class Model(nn.Module):
             x_enc = x_enc - means
             stdev = torch.sqrt(torch.var(x_enc, dim=1, keepdim=True, unbiased=False) + 1e-5)
             x_enc /= stdev
+            
+            # Normalize x_dec exogenous variables using historical means and stdev
+            if x_dec is not None and x_dec.shape[-1] > self.n_vars:
+                x_dec_exog = x_dec[:, -self.pred_len:, self.n_vars:]
+                x_dec_exog = (x_dec_exog - means[:, :, self.n_vars:]) / stdev[:, :, self.n_vars:]
+                x_dec[:, -self.pred_len:, self.n_vars:] = x_dec_exog
 
         x_enc_targets = x_enc[:, :, :self.n_vars]
         en_embed, n_vars = self.en_embedding(x_enc_targets.permute(0, 2, 1))
-        ex_embed = self.ex_embedding(x_enc, x_mark_enc)
+        
+        # Merge historical exogenous with future exogenous
+        if x_enc.shape[-1] > self.n_vars and x_dec is not None:
+            exog_enc = x_enc[:, :, self.n_vars:]
+            exog_dec = x_dec[:, -self.pred_len:, self.n_vars:]
+            exog_full = torch.cat([exog_enc, exog_dec], dim=1) # Shape: [B, seq_len + pred_len, n_exog]
+            mark_full = torch.cat([x_mark_enc, x_mark_dec[:, -self.pred_len:, :]], dim=1)
+            
+            # Use the new embedding layer that supports seq_len + pred_len
+            ex_embed = self.ex_embedding_future(exog_full, mark_full)
+            
+            # Repeat ex_embed for each target variable to match en_embed's shape
+            ex_embed = ex_embed.repeat_interleave(n_vars, dim=0)
+            
+            # Combine embeddings
+            combined_embed = torch.cat([en_embed, ex_embed], dim=1)
+            enc_out = self.encoder(combined_embed, combined_embed)
+            
+            # Extract target outputs
+            enc_out = enc_out[:, :en_embed.shape[1], :]
+        else:
+            ex_embed = self.ex_embedding(x_enc, x_mark_enc)
+            enc_out = self.encoder(en_embed, ex_embed)
 
-        enc_out = self.encoder(en_embed, ex_embed)
         enc_out = torch.reshape(
             enc_out, (-1, n_vars, enc_out.shape[-2], enc_out.shape[-1]))
         # z: [bs x nvars x d_model x patch_num]
