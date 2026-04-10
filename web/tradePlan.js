@@ -424,7 +424,9 @@ function allocateSlots(candidates, params) {
   const items = candidates.map((c, idx) => {
     const profitPerSlot = Number(c && c.profitPerSlot);
     const confidence = clamp(Number(c && c.confidence), 0, 1);
-    const weight = (Number.isFinite(profitPerSlot) ? Math.max(0, profitPerSlot) : 0) * confidence;
+    const score = Number(c && c.score);
+    const weightedProfit = (Number.isFinite(profitPerSlot) ? Math.max(0, profitPerSlot) : 0) * confidence;
+    const weight = Number.isFinite(score) && score > 0 ? score : weightedProfit;
     return { idx, weight };
   });
 
@@ -533,7 +535,9 @@ async function createBulletPlan({ rootDir, dataParser, forecast, params }) {
 
   const profitPerSlot = bulletInfo.stackSize * profitPerUnit;
   const riskAdjustedProfitPerSlot = params.strategy === 'aggressive' ? profitPerSlot : profitPerSlot * confidence;
-  const score = (Number.isFinite(confidence) ? confidence : 0) * (Number.isFinite(profitPerSlot) ? profitPerSlot : 0);
+  const score = params.strategy === 'aggressive'
+    ? (Number.isFinite(profitPerSlot) ? profitPerSlot : 0)
+    : (Number.isFinite(confidence) ? confidence : 0) * (Number.isFinite(profitPerSlot) ? profitPerSlot : 0);
 
   return {
     ok: true,
@@ -601,7 +605,23 @@ async function createTradePlanAll({ dataParser, forecastProvider, forceRefresh =
   const plansBuilt = plansRaw.filter(Boolean);
   const okFlagPlans = plansBuilt.filter((p) => p && p.ok);
   const profitPlans = okFlagPlans.filter((p) => p.profitPerSlot > 0);
-  const okPlans = profitPlans.filter((p) => p.confidence >= params.minConfidence);
+
+  // 当严格阈值导致空计划时，自动放宽置信度阈值，避免前端“无结果”。
+  const requestedMinConfidence = Number.isFinite(params.minConfidence) ? params.minConfidence : 0;
+  let appliedMinConfidence = requestedMinConfidence;
+  let okPlans = profitPlans.filter((p) => Number(p.confidence) >= appliedMinConfidence);
+  if (okPlans.length === 0 && profitPlans.length > 0) {
+    const fallbackThresholds = [0.4, 0.3, 0.2, 0.1, 0];
+    for (const t of fallbackThresholds) {
+      if (t >= appliedMinConfidence) continue;
+      const relaxed = profitPlans.filter((p) => Number(p.confidence) >= t);
+      if (relaxed.length > 0) {
+        appliedMinConfidence = t;
+        okPlans = relaxed;
+        break;
+      }
+    }
+  }
 
   okPlans.sort((a, b) => b.score - a.score);
   const limitedRaw = params.maxBullets > 0 ? okPlans.slice(0, params.maxBullets) : okPlans;
@@ -662,6 +682,8 @@ async function createTradePlanAll({ dataParser, forecastProvider, forceRefresh =
       plansOkFlag: okFlagPlans.length,
       plansProfitPositive: profitPlans.length,
       plansConfidenceOk: okPlans.length,
+      minConfidenceRequested: requestedMinConfidence,
+      minConfidenceApplied: appliedMinConfidence,
       bestRiskAdjustedProfitPerSlot: bestRaps == null ? null : bestRaps,
       bestConfidence: bestConfidence == null ? null : bestConfidence,
       bestProfitPerUnit: bestProfitPerUnit == null ? null : bestProfitPerUnit

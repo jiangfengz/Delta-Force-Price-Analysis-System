@@ -44,9 +44,9 @@
                         <div class="field">
                             <label for="rangeSelect">历史范围</label>
                             <select id="rangeSelect">
+                                <option value="all">全部</option>
                                 <option value="7d">近 7 天</option>
                                 <option value="30d">近 30 天</option>
-                                <option value="all">全部</option>
                             </select>
                         </div>
                         <div>
@@ -330,7 +330,14 @@
             refreshBtn.disabled = true;
             setStatus('加载中…');
             try {
-                const series = await fetchJson(`/api/series?bullet=${encodeURIComponent(bullet)}&range=${encodeURIComponent(range)}`);
+                let effectiveRange = range;
+                let series = await fetchJson(`/api/series?bullet=${encodeURIComponent(bullet)}&range=${encodeURIComponent(range)}`);
+                if (effectiveRange !== 'all' && (!series.points || series.points.length === 0)) {
+                    // 数据存在但近 7/30 天为空时，自动回退到全量区间，避免页面看起来“无价格”。
+                    effectiveRange = 'all';
+                    rangeSelect.value = 'all';
+                    series = await fetchJson(`/api/series?bullet=${encodeURIComponent(bullet)}&range=all`);
+                }
                 let forecast = { available: false, points: [] };
                 try {
                     forecast = await fetchJson(`/api/forecast?bullet=${encodeURIComponent(bullet)}`);
@@ -342,9 +349,11 @@
                 metaBadge.textContent = `${series.category || category}`;
                 updateKpis(series.points || [], forecast);
                 if (forecast.available) {
-                    setStatus(`模型：${forecast.modelGroup} / ${forecast.modelId}，预测 ${forecast.predLen} 小时`);
+                    const rangeText = effectiveRange === 'all' ? '全部' : effectiveRange === '30d' ? '近 30 天' : '近 7 天';
+                    setStatus(`范围：${rangeText}；模型：${forecast.modelGroup} / ${forecast.modelId}，预测 ${forecast.predLen} 小时`);
                 } else {
-                    setStatus('该子弹暂无已训练模型，已仅展示历史数据');
+                    const rangeText = effectiveRange === 'all' ? '全部' : effectiveRange === '30d' ? '近 30 天' : '近 7 天';
+                    setStatus(`范围：${rangeText}；该子弹暂无已训练模型，已仅展示历史数据`);
                 }
             } catch (e) {
                 setStatus(e.message || '加载失败');

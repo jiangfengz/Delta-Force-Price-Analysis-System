@@ -59,115 +59,115 @@ def _default_category_exog_dir():
 MODEL_CONFIGS = {
     "5.56x45mm": ModelConfig(
         model_group="5.56x45mm",
-        model_id="V18_7d_556x45mm_Collection_Category_Exp_Long_M_336_A_B_Best_LRDown_M_336_D512_P168",
+        model_id="V19_7d_556x45mm_Collection_Category_Exp_Long_M_336_A_B_Best_LRDown_M_336_D512_P168",
         category_csv="5.56x45mm.csv",
         dropout=0.3,
     ),
     ".300BLK": ModelConfig(
         model_group=".300BLK",
-        model_id="V18_7d_300BLK_Collection_Category_Opt2_192_Plateau4_B_Best_LRDown_M_192_D512_P168",
+        model_id="V19_7d_300BLK_Collection_Category_Opt2_192_Plateau4_B_Best_LRDown_M_192_D512_P168",
         category_csv=".300BLK.csv",
         dropout=0.1,
     ),
     "箭矢": ModelConfig(
         model_group="箭矢",
-        model_id="V18_7d_Arrow_Collection_Category_Deep6_240_B_Best_LRDown_M_240_D512_P168",
+        model_id="V19_7d_Arrow_Collection_Category_Deep6_240_B_Best_LRDown_M_240_D512_P168",
         category_csv="箭矢.csv",
         dropout=0.1,
     ),
     "9x19mm": ModelConfig(
         model_group="9x19mm",
-        model_id="V18_7d_9x19mm_Collection_Category_MidLarge_336_D_Best_LongSeq_M_336_D640_P168",
+        model_id="V19_7d_9x19mm_Collection_Category_MidLarge_336_D_Best_LongSeq_M_336_D640_P168",
         category_csv="9x19mm.csv",
         dropout=0.1,
     ),
     "9x39mm": ModelConfig(
         model_group="9x39mm",
-        model_id="V18_7d_9x39mm_Collection_Category_Opt2_192_Plateau4_B_Best_LRDown_M_192_D512_P168",
+        model_id="V19_7d_9x39mm_Collection_Category_Opt2_192_Plateau4_B_Best_LRDown_M_192_D512_P168",
         category_csv="9x39mm.csv",
         dropout=0.1,
     ),
     "7.62x39mm": ModelConfig(
         model_group="7.62x39mm",
-        model_id="V18_7d_762x39mm_Collection_Category_Opt2_192_Plateau4_B_Best_LRDown_M_192_D512_P168",
+        model_id="V19_7d_762x39mm_Collection_Category_Opt2_192_Plateau4_B_Best_LRDown_M_192_D512_P168",
         category_csv="7.62x39mm.csv",
         dropout=0.1,
     ),
     "7.62x51mm": ModelConfig(
         model_group="7.62x51mm",
-        model_id="V18_7d_762x51mm_Collection_Category_Deep6_240_B_Best_LRDown_M_240_D512_P168",
+        model_id="V19_7d_762x51mm_Collection_Category_Deep6_240_B_Best_LRDown_M_240_D512_P168",
         category_csv="7.62x51mm.csv",
         dropout=0.1,
     ),
     "7.62x54R": ModelConfig(
         model_group="7.62x54R",
-        model_id="V17_7d_762x54R_Collection_Category_Exp_Long_M_336_A_M_336_D512_P168",
+        model_id="V19_7d_762x54R_Collection_Category_Exp_Long_M_336_A_M_336_D512_P168",
         category_csv="7.62x54R.csv",
         dropout=0.1,
     ),
     "5.45x39mm": ModelConfig(
         model_group="5.45x39mm",
-        model_id="V17_7d_545x39mm_Collection_Category_MidLarge_640_M_240_D640_P168",
+        model_id="V19_7d_545x39mm_Collection_Category_MidLarge_640_M_240_D640_P168",
         category_csv="5.45x39mm.csv",
         dropout=0.1,
     ),
     "5.7x28mm": ModelConfig(
         model_group="5.7x28mm",
-        model_id="V17_7d_57x28mm_Collection_Category_Deep6_240_M_240_D512_P168",
+        model_id="V19_7d_57x28mm_Collection_Category_Deep6_240_M_240_D512_P168",
         category_csv="5.7x28mm.csv",
         dropout=0.1,
     ),
     "5.8x42mm": ModelConfig(
         model_group="5.8x42mm",
-        model_id="V18_7d_58x42mm_Collection_Category_Deep6_240_B_Best_LRDown_M_240_D512_P168",
+        model_id="V19_7d_58x42mm_Collection_Category_Deep6_240_B_Best_LRDown_M_240_D512_P168",
         category_csv="5.8x42mm.csv",
         dropout=0.1,
     ),
     "6.8x51mm": ModelConfig(
         model_group="6.8x51mm",
-        model_id="V17_7d_68x51mm_Collection_Category_Deep6_240_M_240_D512_P168",
+        model_id="V19_7d_68x51mm_Collection_Category_Deep6_240_M_240_D512_P168",
         category_csv="6.8x51mm.csv",
         dropout=0.1,
     ),
     "4.6x30mm": ModelConfig(
         model_group="4.6x30mm",
-        model_id="V18_7d_46x30mm_Collection_Category_Opt2_192_Plateau4_E_Best_Patch32_M_192_D512_P168",
+        model_id="V19_7d_46x30mm_Collection_Category_Opt2_192_Plateau4_E_Best_Patch32_M_192_D512_P168",
         category_csv="4.6x30mm.csv",
         dropout=0.1,
     ),
     "12.7x55mm": ModelConfig(
         model_group="12.7x55mm",
-        model_id="V18_7d_127x55mm_Collection_Category_Deep6_240_C_Best_LRUp_M_240_D512_P168",
+        model_id="V19_7d_127x55mm_Collection_Category_Deep6_240_C_Best_LRUp_M_240_D512_P168",
         category_csv="12.7x55mm.csv",
         dropout=0.1,
     ),
     "12 Gauge": ModelConfig(
         model_group="12 Gauge",
-        model_id="V18_7d_12Gauge_Collection_Category_LongCtx2_480_D_Best_LongSeq_M_480_D512_P168",
+        model_id="V19_7d_12Gauge_Collection_Category_LongCtx2_480_D_Best_LongSeq_M_480_D512_P168",
         category_csv="12 Gauge.csv",
         dropout=0.1,
     ),
     ".357 Magnum": ModelConfig(
         model_group=".357 Magnum",
-        model_id="V18_7d_357Magnum_Collection_Category_LongCtx2_384_E_Best_Patch32_M_384_D512_P168",
+        model_id="V19_7d_357Magnum_Collection_Category_LongCtx2_384_E_Best_Patch32_M_384_D512_P168",
         category_csv=".357 Magnum.csv",
         dropout=0.1,
     ),
     "45-70 Govt": ModelConfig(
         model_group="45-70 Govt",
-        model_id="V17_7d_4570Govt_Collection_Category_Exp_Long_M_336_A_M_336_D512_P168",
+        model_id="V19_7d_4570Govt_Collection_Category_Exp_Long_M_336_A_M_336_D512_P168",
         category_csv="45-70 Govt.csv",
         dropout=0.1,
     ),
     ".45 ACP": ModelConfig(
         model_group=".45 ACP",
-        model_id="V18_7d_45ACP_Collection_Category_Exp_Long_M_336_A_B_Best_LRDown_M_336_D512_P168",
+        model_id="V19_7d_45ACP_Collection_Category_Exp_Long_M_336_A_B_Best_LRDown_M_336_D512_P168",
         category_csv=".45 ACP.csv",
         dropout=0.1,
     ),
     ".50 AE": ModelConfig(
         model_group=".50 AE",
-        model_id="V17_7d_50AE_Collection_Category_Opt2_192_Plateau4_M_192_D512_P168",
+        model_id="V19_7d_50AE_Collection_Category_Opt2_192_Plateau4_M_192_D512_P168",
         category_csv=".50 AE.csv",
         dropout=0.1,
     ),
@@ -581,6 +581,10 @@ class TimeXerRunner:
 
         meta = _load_meta(cfg.model_id)
         args = _build_args_from_meta(meta, enc_in, dec_in, c_out, cfg.model_id, cfg.dropout)
+        # 运行环境未启用 CUDA 时自动回退 CPU，避免预测全量失败。
+        if not torch.cuda.is_available():
+            args.use_gpu = False
+            args.use_multi_gpu = False
         exp = Exp_Long_Term_Forecast(args)
         checkpoint_path = os.path.join(args.checkpoints, args.model_id, "checkpoint.pth")
         exp.model.load_state_dict(torch.load(checkpoint_path, map_location=exp.device))
@@ -651,7 +655,10 @@ class TimeXerRunner:
         x_times = df["date"].iloc[-seq_len:].to_list()
         x_mark = _time_features(x_times, args.freq)
 
-        if target_count == values_x.shape[1]:
+        if category_exog_dir and target_count < values_x.shape[1]:
+            # 启用外生变量时，decoder 输入维度应为 dec_in（targets + exog）。
+            y_label = scaled_x[-label_len:, :]
+        elif target_count == values_x.shape[1]:
             y_label = scaled_x[-label_len:, :]
         else:
             y_label = scaled_x[-label_len:, :target_count]
@@ -766,4 +773,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

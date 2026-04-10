@@ -404,19 +404,54 @@ app.shutdown = async () => {
   await shutdownTimeXerWorker();
 };
 
-// 启动服务器
+// 启动服务器（端口被占用时自动顺延，避免 npm start 直接失败）
 if (require.main === module) {
-  const server = app.listen(PORT, () => {
-    console.log(`服务器运行在 http://localhost:${PORT}`);
-  });
+  const maxPortRetry = 20;
   let shuttingDown = false;
+  let activeServer = null;
+
+  const startWithPortRetry = (basePort) => {
+    return new Promise((resolve, reject) => {
+      const tryListen = (port, attempt) => {
+        const server = app.listen(port, () => {
+          resolve({ server, port });
+        });
+        server.once('error', (error) => {
+          if (error && error.code === 'EADDRINUSE' && attempt < maxPortRetry) {
+            tryListen(port + 1, attempt + 1);
+            return;
+          }
+          reject(error);
+        });
+      };
+      tryListen(basePort, 0);
+    });
+  };
+
+  startWithPortRetry(PORT)
+    .then(({ server, port }) => {
+      activeServer = server;
+      if (port !== PORT) {
+        console.warn(`端口 ${PORT} 被占用，已切换到 http://localhost:${port}`);
+      } else {
+        console.log(`服务器运行在 http://localhost:${port}`);
+      }
+    })
+    .catch((error) => {
+      console.error(`服务器启动失败：${error.message || String(error)}`);
+      process.exit(1);
+    });
+
   const gracefulExit = async () => {
     if (shuttingDown) return;
     shuttingDown = true;
-    await new Promise((resolve) => server.close(resolve));
+    if (activeServer) {
+      await new Promise((resolve) => activeServer.close(resolve));
+    }
     await app.shutdown();
     process.exit(0);
   };
+
   process.on('SIGINT', () => {
     void gracefulExit();
   });
