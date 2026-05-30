@@ -127,7 +127,10 @@ function ensureTimeXerWorker() {
   });
 
   timexerWorker.stderr.setEncoding('utf8');
-  timexerWorker.stderr.on('data', () => {});
+  timexerWorker.stderr.on('data', (chunk) => {
+    const lines = String(chunk).trim().split(/\r?\n/).filter(Boolean);
+    for (const line of lines) console.error(`[TimeXer Worker] ${line}`);
+  });
 
   timexerWorker.on('exit', () => {
     timexerWorkerReady = false;

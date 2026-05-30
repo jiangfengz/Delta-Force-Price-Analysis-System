@@ -20,7 +20,9 @@
                 <a href="/trade-plan.html">倒卖计划</a>
                 <a href="/thesis/项目总体架构图.html">项目架构</a>
             </nav>
-            <div class="actions"></div>
+            <div class="actions">
+                <button class="btn btn--ghost" id="themeToggle" type="button" title="切换亮/暗主题">🌙</button>
+            </div>
         </div>
     </header>
 
@@ -234,13 +236,13 @@
             const forecastLabels = forecastPoints.map(p => formatTs(p.ts));
             const forecastValues = forecastPoints.map(p => p.price);
 
-            const labels = historyLabels.concat(forecastLabels);
-            const histData = historyValues.concat(Array(forecastValues.length).fill(null));
-            const predData = Array(historyValues.length).fill(null).concat(forecastValues);
+            const hasForecast = forecastPoints.length > 0;
+            const labels = hasForecast ? historyLabels.concat(forecastLabels) : historyLabels;
+            const histData = hasForecast ? historyValues.concat(Array(forecastValues.length).fill(null)) : historyValues;
 
             chart.data.labels = labels;
             const t = themeTokens();
-            chart.data.datasets = [
+            const datasets = [
                 {
                     label: '历史均价',
                     data: histData,
@@ -248,8 +250,11 @@
                     backgroundColor: hexToRgba(t.accent2, 0.12),
                     pointRadius: 0,
                     tension: 0.2
-                },
-                {
+                }
+            ];
+            if (hasForecast) {
+                const predData = Array(historyValues.length).fill(null).concat(forecastValues);
+                datasets.push({
                     label: 'TimeXer 预测',
                     data: predData,
                     borderColor: hexToRgba(t.accent, 0.95),
@@ -257,8 +262,9 @@
                     borderDash: [6, 4],
                     pointRadius: 0,
                     tension: 0.2
-                }
-            ];
+                });
+            }
+            chart.data.datasets = datasets;
             chart.update();
         }
 
@@ -338,22 +344,22 @@
                     rangeSelect.value = 'all';
                     series = await fetchJson(`/api/series?bullet=${encodeURIComponent(bullet)}&range=all`);
                 }
-                let forecast = { available: false, points: [] };
+                let forecast = { available: false, points: [], reason: '' };
                 try {
                     forecast = await fetchJson(`/api/forecast?bullet=${encodeURIComponent(bullet)}`);
                 } catch (e) {
-                    forecast = { available: false, points: [] };
+                    forecast = { available: false, points: [], reason: e.message || '请求失败' };
                 }
 
                 setChart(series.points || [], (forecast.available ? forecast.points : []));
                 metaBadge.textContent = `${series.category || category}`;
                 updateKpis(series.points || [], forecast);
+                const rangeText = effectiveRange === 'all' ? '全部' : effectiveRange === '30d' ? '近 30 天' : '近 7 天';
                 if (forecast.available) {
-                    const rangeText = effectiveRange === 'all' ? '全部' : effectiveRange === '30d' ? '近 30 天' : '近 7 天';
                     setStatus(`范围：${rangeText}；模型：${forecast.modelGroup} / ${forecast.modelId}，预测 ${forecast.predLen} 小时`);
                 } else {
-                    const rangeText = effectiveRange === 'all' ? '全部' : effectiveRange === '30d' ? '近 30 天' : '近 7 天';
-                    setStatus(`范围：${rangeText}；该子弹暂无已训练模型，已仅展示历史数据`);
+                    const reason = forecast.reason || '暂无已训练模型';
+                    setStatus(`范围：${rangeText}；${reason}，已仅展示历史数据`);
                 }
             } catch (e) {
                 setStatus(e.message || '加载失败');
@@ -364,7 +370,12 @@
 
         categorySelect.addEventListener('change', async () => {
             const category = categorySelect.value;
-            await loadBullets(category);
+            try {
+                await loadBullets(category);
+            } catch (e) {
+                setStatus(`加载子弹列表失败：${e.message || '请刷新重试'}`);
+                return;
+            }
             await refresh();
         });
         bulletSelect.addEventListener('change', refresh);
@@ -372,13 +383,44 @@
         refreshBtn.addEventListener('click', refresh);
 
         (async () => {
-            await loadCategories();
-            if (categorySelect.options.length > 0) {
-                await loadBullets(categorySelect.value);
+            try {
+                await loadCategories();
+                if (categorySelect.options.length > 0) {
+                    await loadBullets(categorySelect.value);
+                }
+                applyChartTheme();
+                await refresh();
+            } catch (e) {
+                setStatus(`初始化失败：${e && e.message ? e.message : '未知错误，请刷新页面'}`);
             }
-            applyChartTheme();
-            await refresh();
         })();
+
+        const themeToggle = document.getElementById('themeToggle');
+        function applyTheme() {
+            const root = document.documentElement;
+            const current = root.getAttribute('data-theme') || 'light';
+            const next = current === 'light' ? 'dark' : 'light';
+            root.setAttribute('data-theme', next);
+            themeToggle.textContent = next === 'light' ? '🌙' : '☀️';
+            themeToggle.title = next === 'light' ? '切换暗色主题' : '切换亮色主题';
+            applyChartTheme();
+        }
+        (function initTheme() {
+            const saved = localStorage.getItem('theme');
+            if (saved === 'light' || saved === 'dark') {
+                document.documentElement.setAttribute('data-theme', saved);
+            }
+            const current = document.documentElement.getAttribute('data-theme') || 'light';
+            themeToggle.textContent = current === 'light' ? '🌙' : '☀️';
+            themeToggle.title = current === 'light' ? '切换暗色主题' : '切换亮色主题';
+        })();
+        themeToggle.addEventListener('click', () => {
+            applyTheme();
+            const theme = document.documentElement.getAttribute('data-theme');
+            if (theme === 'light' || theme === 'dark') {
+                try { localStorage.setItem('theme', theme); } catch {}
+            }
+        });
     </script>
 </body>
 </html>

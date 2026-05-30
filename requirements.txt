@@ -1,20 +1,34 @@
-einops>=0.6.1
-matplotlib==3.7.0
-numpy==1.23.5
-pandas==1.5.3
-patool==1.12
-reformer-pytorch==1.4.4
-scikit-learn==1.2.2
-scipy==1.10.1
-sktime==0.16.1
-sympy==1.11.1
+# 深度学习框架
 torch==2.0.0
 torchvision==0.15.1
-tqdm==4.64.1
+einops>=0.6.1
 
+# 数据处理
+numpy==1.23.5
+pandas==1.5.3
+scipy==1.10.1
+
+# 机器学习与时间序列
+scikit-learn==1.2.2
+sktime==0.16.1
+
+# 时间序列模型依赖
+reformer-pytorch==1.4.4
+
+# 可视化与工具
+matplotlib==3.7.0
+tqdm==4.64.1
+sympy==1.11.1
+patool==1.12
+
+# Web 数据抓取与解析
 requests>=2.31.0
 beautifulsoup4>=4.12.2
-python-bidi>=0.4.2
+
+# OCR 与图像处理（公告分析用）
 easyocr>=1.7.1
 opencv-python>=4.8.1.78
+python-bidi>=0.4.2
+
+# 环境与配置
 python-dotenv

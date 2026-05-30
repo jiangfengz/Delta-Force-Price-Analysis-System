@@ -59,3 +59,8 @@ Datasets/daily Dataset/
 TimeXer/backup/
 Datasets/__pycache__/
 TimeXer/result_long_term_forecast.txt
+
+.claude/
+毕设文档/
+screenshots/
+scripts/
