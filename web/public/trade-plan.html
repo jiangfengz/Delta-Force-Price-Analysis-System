@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>倒卖计划 - 三角洲行动</title>
+    <link rel="icon" href="data:,">
     <link rel="stylesheet" href="/css/theme.css">
     <link rel="stylesheet" href="/css/app.css">
 </head>
@@ -84,12 +85,12 @@
                             <table class="tp-table" id="planTable">
                                 <thead>
                                     <tr>
-                                        <th data-key="bullet"><span class="tp-th-inner"><span class="tp-th-text"></span>子弹</span><span class="tp-sort" aria-hidden="true"></span></span></th>
+                                        <th data-key="bullet"><span class="tp-th-inner"><span class="tp-th-text">子弹</span><span class="tp-sort" aria-hidden="true"></span></span></th>
                                         <th data-key="units"><span class="tp-th-inner"><span class="tp-th-text">数量</span><span class="tp-sort" aria-hidden="true"></span></span></th>
                                         <th data-key="positionRatio"><span class="tp-th-inner"><span class="tp-th-text">持仓%</span><span class="tp-sort" aria-hidden="true"></span></span></th>
                                         <th data-key="mape"><span class="tp-th-inner"><span class="tp-th-text">MAPE</span><span class="tp-sort" aria-hidden="true"></span></span></th>
                                         <th data-key="confidence"><span class="tp-th-inner"><span class="tp-th-text">置信度</span><span class="tp-sort" aria-hidden="true"></span></span></th>
-                                        <th data-key="riskAdjustedProfitPerSlot"><span class="tp-th-inner"><span class="tp-th-text">预期单格利润</span><span class="tp-sort" aria-hidden="true"></span></span></th>
+                                        <th data-key="profitPerSlot"><span class="tp-th-inner"><span class="tp-th-text">预期单格利润</span><span class="tp-sort" aria-hidden="true"></span></span></th>
                                         <th data-key="score"><span class="tp-th-inner"><span class="tp-th-text">Score</span><span class="tp-sort" aria-hidden="true"></span></span></th>
                                     </tr>
                                 </thead>
@@ -225,6 +226,14 @@
                 .replaceAll('"', '&quot;')
                 .replaceAll("'", '&#39;');
         }
+        // 将浮点参数规范化为人类可读字符串，避免 float32→float64 转换带来的精度尾巴（如 0.15000000596046448 → '0.15'）。
+        function formatParamValue(value, digits = 4) {
+            const n = Number(value);
+            if (!Number.isFinite(n)) return '';
+            const factor = Math.pow(10, digits);
+            const rounded = Math.round(n * factor) / factor;
+            return String(rounded);
+        }
 
         async function fetchJson(url, { signal } = {}) {
             const resp = await fetch(url, { signal });
@@ -269,8 +278,10 @@
             const faint = s.getPropertyValue('--app-faint').trim() || 'rgba(255,255,255,0.36)';
             const accent = s.getPropertyValue('--app-accent').trim() || '#6ef1ff';
             const accent2 = s.getPropertyValue('--app-accent-2').trim() || '#ffcc66';
+            const success = s.getPropertyValue('--app-success').trim() || '#7dffb2';
+            const danger = s.getPropertyValue('--app-danger').trim() || '#ff4d6d';
             const border = s.getPropertyValue('--app-border').trim() || 'rgba(255,255,255,0.10)';
-            return { fg, muted, faint, accent, accent2, border };
+            return { fg, muted, faint, accent, accent2, success, danger, border };
         }
         function hexToRgba(hex, alpha) {
             const h = (hex || '').trim();
@@ -398,7 +409,7 @@
                 const ratio = formatPct(p.positionRatio, 2);
                 const mape = p.mape == null ? '—' : formatNumber(p.mape, 3);
                 const confidence = formatNumber(p.confidence, 3);
-                const raps = formatNumber(p.riskAdjustedProfitPerSlot, 2);
+                const raps = formatNumber(p.profitPerSlot, 2);
                 const score = formatNumber(p.score, 2);
                 const isActive = selectedBullet && selectedBullet.bullet === p.bullet;
                 return `<tr class="tp-row${isActive ? ' is-active' : ''}" data-bullet="${escapeHtml(p.bullet)}">
@@ -502,7 +513,7 @@
             detailSlots.textContent = `${formatNumber(plan.slots, 0)} 格 / ${formatNumber(plan.units, 0)} 发${ratioText}`;
             detailStack.textContent = `${formatNumber(plan.stackSize, 0)} 发/格`;
             detailConf.textContent = `${formatNumber(plan.confidence, 3)}（MAPE ${plan.mape == null ? '—' : formatNumber(plan.mape, 3)}）`;
-            detailRaps.textContent = formatNumber(plan.riskAdjustedProfitPerSlot, 2);
+            detailRaps.textContent = formatNumber(plan.profitPerSlot, 2);
             tradesWrap.innerHTML = tradesTable(plan);
             triggerWrap.innerHTML = tradeTriggerSummary(plan);
             loadChartBtn.disabled = false;
@@ -525,15 +536,15 @@
             meta.push(result.cached ? 'cached=true' : 'cached=false');
             planMeta.textContent = meta.join(' · ');
             lastServerParams = params;
-            if (Number.isFinite(params.maxBullets)) maxBulletsInput.value = String(Number(params.maxBullets));
-            if (Number.isFinite(params.sellFeeRate)) sellFeeRateInput.value = Number(params.sellFeeRate).toFixed(4).replace(/0+$/, '').replace(/\.$/, '');
-            if (Number.isFinite(params.minRoi)) minRoiInput.value = Number(params.minRoi).toFixed(4).replace(/0+$/, '').replace(/\.$/, '');
+            if (Number.isFinite(params.maxBullets)) maxBulletsInput.value = String(Math.round(Number(params.maxBullets)));
+            if (Number.isFinite(params.sellFeeRate)) sellFeeRateInput.value = formatParamValue(params.sellFeeRate);
+            if (Number.isFinite(params.minRoi)) minRoiInput.value = formatParamValue(params.minRoi);
             if (strategySelect) {
                 const strategyRaw = params && params.strategy != null ? String(params.strategy) : '';
                 const strategy = strategyRaw.trim().toLowerCase();
                 strategySelect.value = strategy === 'conservative' ? 'conservative' : 'aggressive';
             }
-            if (Number.isFinite(params.minConfidence)) minConfidenceInput.value = Number(params.minConfidence).toFixed(4).replace(/0+$/, '').replace(/\.$/, '');
+            if (Number.isFinite(params.minConfidence)) minConfidenceInput.value = formatParamValue(params.minConfidence);
         }
 
         async function loadPlan() {
@@ -803,7 +814,8 @@
                     await loadScript('/vendor/chart.js', { timeoutMs: 8000 });
                 } catch {}
                 if (!window.Chart) throw new Error('无法加载 Chart.js');
-                const range = '7d';
+                // 同时展示最近 3 天历史 + 预测曲线（历史范围以最新数据点为基准，见 /api/series）。
+                const range = '3d';
                 const series = await fetchJson(`/api/series?bullet=${encodeURIComponent(bullet)}&range=${encodeURIComponent(range)}`);
                 let forecast = { available: false, points: [] };
                 try {
@@ -853,23 +865,29 @@
                     });
                 }
                 if (trades.length > 0) {
+                    // 买点 / 卖点用对比鲜明且彼此不同的颜色与形状区分：
+                    // 买点 = 绿色上三角，卖点 = 红色菱形；二者均区别于历史(accent2)与预测(accent)曲线。
                     chart.data.datasets.push(
                         {
                             label: '买点',
                             data: buyMarks,
-                            borderColor: hexToRgba(t.accent, 0.0),
-                            backgroundColor: hexToRgba(t.accent, 0.95),
-                            pointRadius: 4,
-                            pointHoverRadius: 6,
+                            borderColor: hexToRgba(t.success, 1),
+                            backgroundColor: hexToRgba(t.success, 0.95),
+                            pointStyle: 'triangle',
+                            pointRadius: 6,
+                            pointHoverRadius: 8,
+                            borderWidth: 1.5,
                             showLine: false
                         },
                         {
                             label: '卖点',
                             data: sellMarks,
-                            borderColor: hexToRgba(t.accent2, 0.0),
-                            backgroundColor: hexToRgba(t.accent2, 0.95),
-                            pointRadius: 4,
-                            pointHoverRadius: 6,
+                            borderColor: hexToRgba(t.danger, 1),
+                            backgroundColor: hexToRgba(t.danger, 0.95),
+                            pointStyle: 'rectRot',
+                            pointRadius: 6,
+                            pointHoverRadius: 8,
+                            borderWidth: 1.5,
                             showLine: false
                         }
                     );
@@ -879,7 +897,7 @@
                 const titleParts = [];
                 titleParts.push(bullet);
                 titleParts.push(series && series.category ? series.category : selectedBullet.modelGroup || '');
-                titleParts.push(`近 7 天 + 预测 ${forecast && forecast.available ? (forecast.predLen || 0) : 0}h`);
+                titleParts.push(`近 3 天 + 预测 ${forecast && forecast.available ? (forecast.predLen || 0) : 0}h`);
                 chartTitle.textContent = titleParts.filter(Boolean).join(' · ');
             } catch (e) {
                 chartTitle.textContent = e && e.message ? e.message : '加载失败';

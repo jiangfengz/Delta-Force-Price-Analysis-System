@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>三角洲行动 - 子弹价格与预测</title>
+    <link rel="icon" href="data:,">
     <link rel="stylesheet" href="/css/theme.css">
     <link rel="stylesheet" href="/css/app.css">
-    <script src="/vendor/chart.js"></script>
 </head>
 <body>
     <header class="topbar">
@@ -47,6 +47,7 @@
                             <label for="rangeSelect">历史范围</label>
                             <select id="rangeSelect">
                                 <option value="all">全部</option>
+                                <option value="3d">近 3 天</option>
                                 <option value="7d">近 7 天</option>
                                 <option value="30d">近 30 天</option>
                             </select>
@@ -145,50 +146,97 @@
             return `rgba(${r}, ${g}, ${b}, ${alpha})`;
         }
 
-        const ctx = document.getElementById('priceChart').getContext('2d');
-        const chart = new Chart(ctx, {
-            type: 'line',
-            data: { labels: [], datasets: [] },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                animation: false,
-                interaction: { mode: 'index', intersect: false },
-                plugins: {
-                    legend: {
-                        display: true,
-                        labels: {
-                            color: themeTokens().muted,
-                            boxWidth: 10,
-                            boxHeight: 10,
-                            usePointStyle: true,
-                            pointStyle: 'circle'
+        function loadScript(url, { timeoutMs = 10_000 } = {}) {
+            return new Promise((resolve, reject) => {
+                const el = document.createElement('script');
+                let done = false;
+                const timer = setTimeout(() => {
+                    if (done) return;
+                    done = true;
+                    el.remove();
+                    reject(new Error('加载超时'));
+                }, timeoutMs);
+                el.src = url;
+                el.async = true;
+                el.onload = () => {
+                    if (done) return;
+                    done = true;
+                    clearTimeout(timer);
+                    resolve();
+                };
+                el.onerror = () => {
+                    if (done) return;
+                    done = true;
+                    clearTimeout(timer);
+                    el.remove();
+                    reject(new Error('加载失败'));
+                };
+                document.head.appendChild(el);
+            });
+        }
+
+        let chart = null;
+        let chartReady = null;
+        function ensureChart() {
+            if (chart) return chart;
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: [], datasets: [] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: {
+                                color: themeTokens().muted,
+                                boxWidth: 10,
+                                boxHeight: 10,
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        },
+                        tooltip: {
+                            enabled: true,
+                            backgroundColor: 'rgba(0,0,0,0.75)',
+                            titleColor: 'rgba(255,255,255,0.92)',
+                            bodyColor: 'rgba(255,255,255,0.86)',
+                            borderColor: themeTokens().border,
+                            borderWidth: 1
                         }
                     },
-                    tooltip: {
-                        enabled: true,
-                        backgroundColor: 'rgba(0,0,0,0.75)',
-                        titleColor: 'rgba(255,255,255,0.92)',
-                        bodyColor: 'rgba(255,255,255,0.86)',
-                        borderColor: themeTokens().border,
-                        borderWidth: 1
-                    }
-                },
-                scales: {
-                    x: {
-                        ticks: { maxTicksLimit: 12, color: themeTokens().faint },
-                        grid: { color: hexToRgba(themeTokens().accent, 0.08) }
-                    },
-                    y: {
-                        beginAtZero: false,
-                        ticks: { color: themeTokens().faint },
-                        grid: { color: hexToRgba(themeTokens().accent, 0.08) }
+                    scales: {
+                        x: {
+                            ticks: { maxTicksLimit: 12, color: themeTokens().faint },
+                            grid: { color: hexToRgba(themeTokens().accent, 0.08) }
+                        },
+                        y: {
+                            beginAtZero: false,
+                            ticks: { color: themeTokens().faint },
+                            grid: { color: hexToRgba(themeTokens().accent, 0.08) }
+                        }
                     }
                 }
+            });
+            return chart;
+        }
+        async function ensureChartLib() {
+            if (window.Chart) return;
+            if (!chartReady) {
+                chartReady = loadScript('/vendor/chart.js', { timeoutMs: 10_000 }).catch((e) => {
+                    chartReady = null;
+                    throw e;
+                });
             }
-        });
+            await chartReady;
+            if (!window.Chart) throw new Error('Chart.js 未就绪');
+        }
 
         function applyChartTheme() {
+            if (!chart) return;
             const t = themeTokens();
             chart.options.plugins.legend.labels.color = t.muted;
             chart.options.plugins.tooltip.borderColor = t.border;
@@ -231,6 +279,7 @@
         }
 
         function setChart(historyPoints, forecastPoints) {
+            const c = ensureChart();
             const historyLabels = historyPoints.map(p => formatTs(p.ts));
             const historyValues = historyPoints.map(p => p.price);
             const forecastLabels = forecastPoints.map(p => formatTs(p.ts));
@@ -240,7 +289,7 @@
             const labels = hasForecast ? historyLabels.concat(forecastLabels) : historyLabels;
             const histData = hasForecast ? historyValues.concat(Array(forecastValues.length).fill(null)) : historyValues;
 
-            chart.data.labels = labels;
+            c.data.labels = labels;
             const t = themeTokens();
             const datasets = [
                 {
@@ -264,8 +313,8 @@
                     tension: 0.2
                 });
             }
-            chart.data.datasets = datasets;
-            chart.update();
+            c.data.datasets = datasets;
+            c.update();
         }
 
         function formatNumber(n) {
@@ -336,6 +385,7 @@
             refreshBtn.disabled = true;
             setStatus('加载中…');
             try {
+                await ensureChartLib();
                 let effectiveRange = range;
                 let series = await fetchJson(`/api/series?bullet=${encodeURIComponent(bullet)}&range=${encodeURIComponent(range)}`);
                 if (effectiveRange !== 'all' && (!series.points || series.points.length === 0)) {
@@ -351,11 +401,16 @@
                     forecast = { available: false, points: [], reason: e.message || '请求失败' };
                 }
 
-                setChart(series.points || [], (forecast.available ? forecast.points : []));
+                const seriesPoints = series.points || [];
+                setChart(seriesPoints, (forecast.available ? forecast.points : []));
                 metaBadge.textContent = `${series.category || category}`;
-                updateKpis(series.points || [], forecast);
-                const rangeText = effectiveRange === 'all' ? '全部' : effectiveRange === '30d' ? '近 30 天' : '近 7 天';
-                if (forecast.available) {
+                updateKpis(seriesPoints, forecast);
+                const rangeLabels = { all: '全部', '3d': '近 3 天', '7d': '近 7 天', '30d': '近 30 天' };
+                const rangeText = rangeLabels[effectiveRange] || effectiveRange;
+                if (seriesPoints.length === 0) {
+                    // 全量区间也无数据：明确告知用户，而不是让空图表自己说话。
+                    setStatus(`暂无 ${bullet} 的价格数据（已尝试全部历史区间）`);
+                } else if (forecast.available) {
                     setStatus(`范围：${rangeText}；模型：${forecast.modelGroup} / ${forecast.modelId}，预测 ${forecast.predLen} 小时`);
                 } else {
                     const reason = forecast.reason || '暂无已训练模型';
@@ -388,7 +443,6 @@
                 if (categorySelect.options.length > 0) {
                     await loadBullets(categorySelect.value);
                 }
-                applyChartTheme();
                 await refresh();
             } catch (e) {
                 setStatus(`初始化失败：${e && e.message ? e.message : '未知错误，请刷新页面'}`);

@@ -101,22 +101,22 @@ hold[t] = max(hold[t-1], cash[t-1] - buyCost[t])        // 不动 或 买入
 
 每个子弹生成计划后，计算：
 
-- `profitPerSlot = stackSize * profitPerUnit`
+- `profitPerSlot = stackSize * profitPerUnit`（预期单格利润，未折算置信度）
 - `confidence`：由 MAPE 映射得到
-- `scoreRaw = confidence * profitPerSlot`
+- `scoreRaw = max(0, profitPerSlot) * confidence^γ`（**综合「置信度」与「预期单格利润」**；γ 由策略决定：标准=1、平衡=1.5、保守=2。标准策略下置信度同样参与评分）
 
 然后进行全局筛选：
 
 - 只保留 `ok && profitPerSlot > 0 && confidence >= minConfidence` 的子弹
 - 按 `scoreRaw` 降序排序
 - 取前 `maxBullets` 个（若 `maxBullets > 0`）
-- 将分数线性归一化到 `0..100` 用于展示与排序
+- 展示用分数：按候选集最大值归一化到 `0..100`（`score = scoreRaw / max(scoreRaw) * 100`，仅用于展示与比较；仓位分配使用未归一化的 `scoreRaw`，见下）
 
 ## 仓位分配（allocateSlots）
 
 设总 slots 为 `S = slotsTotal`，对每个候选子弹计算权重：
 
-- `weight = max(0, profitPerSlot) * confidence`
+- `weight = scoreRaw = max(0, profitPerSlot) * confidence^γ`（使用**未归一化**的评分，使持仓与 `score` 严格成正比）
 - 若全部权重为 0，则退化为等权分配
 
 分配方法：

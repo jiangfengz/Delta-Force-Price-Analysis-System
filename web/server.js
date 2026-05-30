@@ -14,9 +14,13 @@ const dataParser = new DataParser();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
-const thesisDocsDir = path.resolve(__dirname, '..', '毕设文档集');
-if (fs.existsSync(thesisDocsDir)) {
-  app.use('/thesis', express.static(thesisDocsDir));
+const thesisDocsCandidates = ['毕设文档', '毕设文档集'];
+for (const name of thesisDocsCandidates) {
+  const dir = path.resolve(__dirname, '..', name);
+  if (fs.existsSync(dir)) {
+    app.use('/thesis', express.static(dir));
+    break;
+  }
 }
 
 app.get('/vendor/chart.js', (req, res) => {
@@ -221,11 +225,13 @@ app.get('/api/series', async (req, res) => {
 
     const points = await dataParser.getBulletPriceSeries(bullet);
     let filtered = points;
-    if (range !== 'all') {
-      const now = Date.now();
-      const days = range === '7d' ? 7 : range === '30d' ? 30 : null;
+    if (range !== 'all' && points.length > 0) {
+      const days = range === '3d' ? 3 : range === '7d' ? 7 : range === '30d' ? 30 : null;
       if (days != null) {
-        const minTs = now - days * 24 * 60 * 60 * 1000;
+        // 历史数据非实时，可能落后于当前时钟；以最新数据点为基准向前取 N 天，
+        // 避免「近 N 天」相对 Date.now() 落空、被迫回退到全部区间（导致历史范围看似无法切换）。
+        const latestTs = points[points.length - 1].ts;
+        const minTs = latestTs - days * 24 * 60 * 60 * 1000;
         filtered = points.filter(p => p.ts >= minTs);
       }
     }

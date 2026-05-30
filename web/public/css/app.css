@@ -424,8 +424,13 @@ select {
   .kpis {
     grid-template-columns: 1fr;
   }
+  .brand {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
   .brand__title {
-    display: none;
+    font-size: 13px;
+    max-width: 60vw;
   }
 }
 
@@ -579,15 +584,15 @@ canvas {
   height: 0;
   border-left: 4px solid transparent;
   border-right: 4px solid transparent;
-  opacity: 0.55;
+  opacity: 0.85;
 }
 
 .tp-sort::before {
-  border-bottom: 6px solid var(--app-faint);
+  border-bottom: 6px solid var(--app-muted);
 }
 
 .tp-sort::after {
-  border-top: 6px solid var(--app-faint);
+  border-top: 6px solid var(--app-muted);
 }
 
 #planTable thead th.is-sort-asc .tp-sort::before {

@@ -260,6 +260,14 @@ function mapeScaleFromStrategy(strategy) {
   return 1;
 }
 
+// 置信度在评分中的权重指数 γ：score = profitPerSlot × confidence^γ。
+// γ 越大，对低置信度标的惩罚越重。保守策略最看重确定性。
+function confidenceExponentFromStrategy(strategy) {
+  if (strategy === 'conservative') return 2;
+  if (strategy === 'balanced') return 1.5;
+  return 1; // aggressive（标准）：置信度线性加权
+}
+
 function buildWorstCaseSeries(predPrices, mape, sellFeeRate, mapeScale) {
   const buyCost = [0];
   const sellRev = [0];
@@ -422,11 +430,10 @@ function allocateSlots(candidates, params) {
   }
 
   const items = candidates.map((c, idx) => {
-    const profitPerSlot = Number(c && c.profitPerSlot);
-    const confidence = clamp(Number(c && c.confidence), 0, 1);
-    const score = Number(c && c.score);
-    const weightedProfit = (Number.isFinite(profitPerSlot) ? Math.max(0, profitPerSlot) : 0) * confidence;
-    const weight = Number.isFinite(score) && score > 0 ? score : weightedProfit;
+    // 权重直接取风险调整后的期望单格利润（= 综合置信度与预期单格利润的原始评分），
+    // 用未归一化的原始值按比例分配仓库格，使持仓与 score 严格成正比。
+    const raps = Number(c && c.riskAdjustedProfitPerSlot);
+    const weight = Number.isFinite(raps) && raps > 0 ? raps : 0;
     return { idx, weight };
   });
 
@@ -534,10 +541,15 @@ async function createBulletPlan({ rootDir, dataParser, forecast, params }) {
   }
 
   const profitPerSlot = bulletInfo.stackSize * profitPerUnit;
-  const riskAdjustedProfitPerSlot = params.strategy === 'aggressive' ? profitPerSlot : profitPerSlot * confidence;
-  const score = params.strategy === 'aggressive'
-    ? (Number.isFinite(profitPerSlot) ? profitPerSlot : 0)
-    : (Number.isFinite(confidence) ? confidence : 0) * (Number.isFinite(profitPerSlot) ? profitPerSlot : 0);
+  // 综合「置信度」与「预期单格利润」得出评分：风险调整后的期望单格利润。
+  // - confidence ∈ [0,1]（由 MAPE 折算）代表预测可靠度；
+  // - profitPerSlot 代表收益空间；
+  // 二者经 confidence^γ 加权相乘，确保两者共同决定评分（标准策略下置信度同样生效）。
+  const profitPerSlotPositive = Number.isFinite(profitPerSlot) ? Math.max(0, profitPerSlot) : 0;
+  const safeConfidence = Number.isFinite(confidence) ? clamp(confidence, 0, 1) : 0;
+  const confidenceWeight = Math.pow(safeConfidence, confidenceExponentFromStrategy(params.strategy));
+  const riskAdjustedProfitPerSlot = profitPerSlotPositive * confidenceWeight;
+  const score = riskAdjustedProfitPerSlot;
 
   return {
     ok: true,
@@ -625,20 +637,18 @@ async function createTradePlanAll({ dataParser, forecastProvider, forceRefresh =
 
   okPlans.sort((a, b) => b.score - a.score);
   const limitedRaw = params.maxBullets > 0 ? okPlans.slice(0, params.maxBullets) : okPlans;
-  let minRaw = null;
-  let maxRaw = null;
+  // 展示用评分：在候选集内按最大值归一化到 0~100，便于横向比较；
+  // 注意仓位分配使用未归一化的 riskAdjustedProfitPerSlot（见 allocateSlots），
+  // 因此「持仓与 score 成正比」——而非旧的 min-max 归一化（会把最低分强行压成 0、持仓归零）。
+  let maxRaw = 0;
   for (const p of limitedRaw) {
     const v = Number(p && p.score);
-    if (!Number.isFinite(v)) continue;
-    if (minRaw == null || v < minRaw) minRaw = v;
-    if (maxRaw == null || v > maxRaw) maxRaw = v;
+    if (Number.isFinite(v) && v > maxRaw) maxRaw = v;
   }
   const limited = limitedRaw.map((p) => {
     const raw = Number(p && p.score);
     const v = Number.isFinite(raw) ? raw : 0;
-    if (minRaw == null || maxRaw == null) return { ...p, score: 0 };
-    if (maxRaw === minRaw) return { ...p, score: 100 };
-    const norm = ((v - minRaw) / (maxRaw - minRaw)) * 100;
+    const norm = maxRaw > 0 ? (v / maxRaw) * 100 : 0;
     return { ...p, score: clamp(norm, 0, 100) };
   }).sort((a, b) => b.score - a.score);
 
