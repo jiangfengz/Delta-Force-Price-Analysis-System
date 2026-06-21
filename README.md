@@ -156,4 +156,4 @@ Web 后端通过 `timexer_worker.py` JSONL 子进程协议调用训练好的 Tim
 
 ## 📝 许可证
 
-[MIT License](LICENSE) (如适用)
+本项目基于 [MIT License](LICENSE) 开源。

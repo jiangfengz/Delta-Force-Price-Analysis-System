@@ -1,8 +1,13 @@
+import os
 import urllib.request
 import json
 
-DEEPSEEK_API_KEY = "sk-c25069090fd440ab8de78bb07e7eecac"
+# 从环境变量读取密钥，切勿将真实密钥硬编码并提交到仓库
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
+
+if not DEEPSEEK_API_KEY:
+    raise SystemExit("请先设置环境变量 DEEPSEEK_API_KEY（可参考根目录 .env.example）")
 
 payload = {
     "model": "deepseek-reasoner",
